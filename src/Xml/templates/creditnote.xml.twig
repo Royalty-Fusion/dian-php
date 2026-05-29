@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CreditNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"
+            xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+            xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
+            xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2"
+            xmlns:sts="dian:gov:co:facturaelectronica:Structures-2-1">
+    <ext:UBLExtensions>
+        <ext:UBLExtension>
+            <ext:ExtensionContent>
+                <sts:DianExtensions>
+                    <sts:InvoiceSource>
+                        <cbc:IdentificationCode listAgencyID="6" listAgencyName="United Nations Economic Commission for Europe" listSchemeURI="http://www.unece.org/cl/directory/3055/3055_4.htm">CO</cbc:IdentificationCode>
+                    </sts:InvoiceSource>
+                    {% if doc.software %}
+                    <sts:SoftwareProvider>
+                        <sts:ProviderID schemeAgencyID="195" schemeAgencyName="CO, DIAN" schemeID="4">{{ doc.software.providerNit }}</sts:ProviderID>
+                        <sts:SoftwareID schemeAgencyID="195" schemeAgencyName="CO, DIAN">{{ doc.software.id }}</sts:SoftwareID>
+                    </sts:SoftwareProvider>
+                    <sts:SoftwareSecurityCode schemeAgencyID="195" schemeAgencyName="CO, DIAN">{{ doc.software.getSecurityCode(doc.prefijo ~ doc.numero) }}</sts:SoftwareSecurityCode>
+                    {% endif %}
+                    <sts:AuthorizationProvider>
+                        <sts:AuthorizationProviderID schemeAgencyID="195" schemeAgencyName="CO, DIAN" schemeID="4">800197268</sts:AuthorizationProviderID>
+                    </sts:AuthorizationProvider>
+                    <sts:QRCode>{{ qrCodeUrl }}</sts:QRCode>
+                </sts:DianExtensions>
+            </ext:ExtensionContent>
+        </ext:UBLExtension>
+        <ext:UBLExtension>
+            <ext:ExtensionContent/>
+        </ext:UBLExtension>
+    </ext:UBLExtensions>
+    <cbc:UBLVersionID>UBL 2.1</cbc:UBLVersionID>
+    <cbc:CustomizationID>20</cbc:CustomizationID>
+    <cbc:ProfileID>DIAN 2.1: Nota Crédito de Factura Electrónica de Venta</cbc:ProfileID>
+    <cbc:ProfileExecutionID>{{ doc.testSetId ? '2' : '1' }}</cbc:ProfileExecutionID>
+    <cbc:ID>{{ doc.prefijo }}{{ doc.numero }}</cbc:ID>
+    <cbc:UUID schemeName="CUDE-SHA384">{{ cude }}</cbc:UUID>
+    <cbc:IssueDate>{{ doc.fecha|date('Y-m-d') }}</cbc:IssueDate>
+    <cbc:IssueTime>{{ doc.fecha|date('H:i:sP') }}</cbc:IssueTime>
+    <cbc:CreditNoteTypeCode>91</cbc:CreditNoteTypeCode>
+    <cbc:DocumentCurrencyCode>COP</cbc:DocumentCurrencyCode>
+    <cbc:LineCountNumeric>{{ doc.items|length }}</cbc:LineCountNumeric>
+    
+    {% if doc.discrepancyResponse %}
+    <cac:DiscrepancyResponse>
+        <cbc:ReferenceID>{{ doc.discrepancyResponse.referenceId }}</cbc:ReferenceID>
+        <cbc:ResponseCode>{{ doc.discrepancyResponse.responseCode }}</cbc:ResponseCode>
+        <cbc:Description>{{ doc.discrepancyResponse.description }}</cbc:Description>
+    </cac:DiscrepancyResponse>
+    {% endif %}
+
+    {% if doc.billingReference %}
+    <cac:BillingReference>
+        <cac:InvoiceDocumentReference>
+            <cbc:ID>{{ doc.billingReference.number }}</cbc:ID>
+            <cbc:UUID schemeName="CUFE-SHA384">{{ doc.billingReference.uuid }}</cbc:UUID>
+            <cbc:IssueDate>{{ doc.billingReference.date|date('Y-m-d') }}</cbc:IssueDate>
+        </cac:InvoiceDocumentReference>
+    </cac:BillingReference>
+    {% endif %}
+
+    {% if doc.company %}
+    <cac:AccountingSupplierParty>
+        <cac:Party>
+            <cac:PartyName>
+                <cbc:Name>{{ doc.company.razonSocial }}</cbc:Name>
+            </cac:PartyName>
+            <cac:PartyTaxScheme>
+                <cbc:RegistrationName>{{ doc.company.razonSocial }}</cbc:RegistrationName>
+                <cbc:CompanyID schemeAgencyID="195" schemeAgencyName="CO, DIAN" schemeID="DV" schemeName="{{ doc.company.tipoDocumento }}">{{ doc.company.nit }}</cbc:CompanyID>
+                <cac:TaxScheme>
+                    <cbc:ID>01</cbc:ID>
+                    <cbc:Name>IVA</cbc:Name>
+                </cac:TaxScheme>
+            </cac:PartyTaxScheme>
+            <cac:PartyLegalEntity>
+                <cbc:RegistrationName>{{ doc.company.razonSocial }}</cbc:RegistrationName>
+                <cac:CorporateRegistrationScheme>
+                    <cbc:Name>{{ doc.company.responsabilidades }}</cbc:Name>
+                </cac:CorporateRegistrationScheme>
+            </cac:PartyLegalEntity>
+        </cac:Party>
+    </cac:AccountingSupplierParty>
+    {% endif %}
+
+    {% if doc.client %}
+    <cac:AccountingCustomerParty>
+        <cac:Party>
+            <cac:PartyName>
+                <cbc:Name>{{ doc.client.razonSocial }}</cbc:Name>
+            </cac:PartyName>
+            <cac:PartyTaxScheme>
+                <cbc:RegistrationName>{{ doc.client.razonSocial }}</cbc:RegistrationName>
+                <cbc:CompanyID schemeAgencyID="195" schemeAgencyName="CO, DIAN" schemeName="{{ doc.client.tipoDocumento }}">{{ doc.client.numeroDocumento }}</cbc:CompanyID>
+                <cac:TaxScheme>
+                    <cbc:ID>01</cbc:ID>
+                    <cbc:Name>IVA</cbc:Name>
+                </cac:TaxScheme>
+            </cac:PartyTaxScheme>
+            <cac:PartyLegalEntity>
+                <cbc:RegistrationName>{{ doc.client.razonSocial }}</cbc:RegistrationName>
+            </cac:PartyLegalEntity>
+            {% if doc.client.email %}
+            <cac:Contact>
+                <cbc:ElectronicMail>{{ doc.client.email }}</cbc:ElectronicMail>
+            </cac:Contact>
+            {% endif %}
+        </cac:Party>
+    </cac:AccountingCustomerParty>
+    {% endif %}
+
+    {% for payment in doc.payments %}
+    <cac:PaymentMeans>
+        <cbc:ID>{{ payment.methodId }}</cbc:ID>
+        <cbc:PaymentMeansCode>{{ payment.meansId }}</cbc:PaymentMeansCode>
+        {% if payment.dueDate %}
+        <cbc:PaymentDueDate>{{ payment.dueDate|date('Y-m-d') }}</cbc:PaymentDueDate>
+        {% endif %}
+    </cac:PaymentMeans>
+    {% endfor %}
+
+    {% for taxCode, group in taxGroupsData %}
+    <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="COP">{{ group.amount|number_format(2, '.', '') }}</cbc:TaxAmount>
+        {% for sub in group.subtotals %}
+        <cac:TaxSubtotal>
+            <cbc:TaxableAmount currencyID="COP">{{ sub.base|number_format(2, '.', '') }}</cbc:TaxableAmount>
+            <cbc:TaxAmount currencyID="COP">{{ sub.amount|number_format(2, '.', '') }}</cbc:TaxAmount>
+            <cac:TaxCategory>
+                <cbc:Percent>{{ sub.percent|number_format(2, '.', '') }}</cbc:Percent>
+                <cac:TaxScheme>
+                    <cbc:ID>{{ sub.code }}</cbc:ID>
+                    <cbc:Name>{{ sub.name }}</cbc:Name>
+                </cac:TaxScheme>
+            </cac:TaxCategory>
+        </cac:TaxSubtotal>
+        {% endfor %}
+    </cac:TaxTotal>
+    {% endfor %}
+
+    <cac:LegalMonetaryTotal>
+        <cbc:LineExtensionAmount currencyID="COP">{{ totals.lineExtensionAmount|number_format(2, '.', '') }}</cbc:LineExtensionAmount>
+        <cbc:TaxExclusiveAmount currencyID="COP">{{ totals.taxExclusiveAmount|number_format(2, '.', '') }}</cbc:TaxExclusiveAmount>
+        <cbc:TaxInclusiveAmount currencyID="COP">{{ totals.taxInclusiveAmount|number_format(2, '.', '') }}</cbc:TaxInclusiveAmount>
+        <cbc:PayableAmount currencyID="COP">{{ totals.payableAmount|number_format(2, '.', '') }}</cbc:PayableAmount>
+    </cac:LegalMonetaryTotal>
+
+    {% for item in doc.items %}
+    <cac:CreditNoteLine>
+        <cbc:ID>{{ loop.index }}</cbc:ID>
+        <cbc:CreditedQuantity unitCode="94">{{ item.cantidad|number_format(2, '.', '') }}</cbc:CreditedQuantity>
+        <cbc:LineExtensionAmount currencyID="COP">{{ (item.cantidad * item.precio)|number_format(2, '.', '') }}</cbc:LineExtensionAmount>
+        {% for tax in item.taxes %}
+        <cac:TaxTotal>
+            <cbc:TaxAmount currencyID="COP">{{ tax.amount|number_format(2, '.', '') }}</cbc:TaxAmount>
+            <cac:TaxSubtotal>
+                <cbc:TaxableAmount currencyID="COP">{{ tax.base|number_format(2, '.', '') }}</cbc:TaxableAmount>
+                <cbc:TaxAmount currencyID="COP">{{ tax.amount|number_format(2, '.', '') }}</cbc:TaxAmount>
+                <cac:TaxCategory>
+                    <cbc:Percent>{{ tax.percent|number_format(2, '.', '') }}</cbc:Percent>
+                    <cac:TaxScheme>
+                        <cbc:ID>{{ tax.code }}</cbc:ID>
+                        <cbc:Name>{{ tax.name }}</cbc:Name>
+                    </cac:TaxScheme>
+                </cac:TaxCategory>
+            </cac:TaxSubtotal>
+        </cac:TaxTotal>
+        {% endfor %}
+        <cac:Item>
+            <cbc:Description>{{ item.descripcion }}</cbc:Description>
+            <cac:StandardItemIdentification>
+                <cbc:ID>999{{ loop.index }}</cbc:ID>
+            </cac:StandardItemIdentification>
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="COP">{{ item.precio|number_format(2, '.', '') }}</cbc:PriceAmount>
+        </cac:Price>
+    </cac:CreditNoteLine>
+    {% endfor %}
+</CreditNote>
