@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>{{ heading }} {{ doc.prefijo }}{{ doc.numero }}</title>
+<style>
+  * { box-sizing: border-box; font-family: 'Helvetica Neue', Arial, sans-serif; color: #1f2937; }
+  body { margin: 0; padding: 24px; font-size: 12px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid {{ accentColor }}; padding-bottom: 12px; margin-bottom: 18px; }
+  .header .branding img { max-height: 72px; }
+  .header h1 { margin: 0 0 4px 0; font-size: 18px; color: {{ accentColor }}; }
+  .header .doc-id { text-align: right; }
+  .header .doc-id .badge { display: inline-block; padding: 4px 10px; background: {{ accentColor }}; color: #fff; border-radius: 4px; font-weight: bold; }
+  .parties { display: flex; gap: 16px; margin-bottom: 18px; }
+  .party { flex: 1; padding: 12px; background: #f3f4f6; border-radius: 4px; }
+  .party h3 { margin: 0 0 6px 0; font-size: 11px; text-transform: uppercase; color: {{ accentColor }}; }
+  table.items { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+  table.items th, table.items td { padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: top; }
+  table.items th { background: {{ accentColor }}; color: #fff; font-size: 11px; text-transform: uppercase; }
+  table.items td.num { text-align: right; }
+  .totals { display: flex; justify-content: flex-end; margin-bottom: 18px; }
+  .totals table { border-collapse: collapse; min-width: 320px; }
+  .totals td { padding: 6px 12px; }
+  .totals tr.total td { border-top: 2px solid {{ accentColor }}; font-size: 14px; font-weight: bold; }
+  .footer { border-top: 1px solid #e5e7eb; padding-top: 12px; font-size: 10px; color: #6b7280; }
+  .footer .uuid { word-break: break-all; }
+  .qr { float: right; margin-left: 16px; }
+</style>
+</head>
+<body>
+<div class="header">
+    <div class="branding">
+        {% if logoUrl %}<img src="{{ logoUrl }}" alt="logo">{% endif %}
+        {% if doc.company %}
+        <div style="margin-top: 8px;">
+            <strong>{{ doc.company.razonSocial }}</strong><br>
+            NIT {{ doc.company.nit }}-{{ doc.company.nitDv }}<br>
+            {% if doc.company.address %}{{ doc.company.address.line }}, {{ doc.company.address.cityName }}{% endif %}<br>
+            {% if doc.company.contact %}{{ doc.company.contact.electronicMail }} · {{ doc.company.contact.telephone }}{% endif %}
+        </div>
+        {% endif %}
+    </div>
+    <div class="doc-id">
+        <h1>{{ heading }}</h1>
+        <div class="badge">{{ doc.prefijo }}{{ doc.numero }}</div>
+        {% if doc.fecha %}<div style="margin-top: 6px;">Fecha: {{ doc.fecha|date('Y-m-d H:i') }}</div>{% endif %}
+        {% if doc.resolution %}<div style="margin-top: 4px;">Res. DIAN {{ doc.resolution.number }}</div>{% endif %}
+    </div>
+</div>
+
+<div class="parties">
+    {% if doc.client %}
+    <div class="party">
+        <h3>Adquiriente</h3>
+        <strong>{{ doc.client.razonSocial }}</strong><br>
+        Documento: {{ doc.client.tipoDocumento }} · {{ doc.client.numeroDocumento }}<br>
+        {% if doc.client.address %}{{ doc.client.address.line }}<br>{{ doc.client.address.cityName }}, {{ doc.client.address.departmentName }}{% endif %}<br>
+        {% if doc.client.email %}{{ doc.client.email }}{% endif %}
+    </div>
+    {% endif %}
+    {% if doc.billingReference %}
+    <div class="party">
+        <h3>Factura referenciada</h3>
+        <strong>{{ doc.billingReference.number }}</strong><br>
+        {% if doc.billingReference.date %}Emitida: {{ doc.billingReference.date|date('Y-m-d') }}<br>{% endif %}
+        CUFE: <span style="word-break: break-all; font-size: 9px;">{{ doc.billingReference.uuid }}</span>
+    </div>
+    {% endif %}
+</div>
+
+<table class="items">
+    <thead>
+    <tr>
+        <th>#</th>
+        <th>Descripción</th>
+        <th class="num">Cantidad</th>
+        <th class="num">Precio unit.</th>
+        <th class="num">IVA</th>
+        <th class="num">Subtotal</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for item in doc.items %}
+    {% set lineTax = 0 %}
+    {% for tax in item.taxes %}{% set lineTax = lineTax + tax.amount %}{% endfor %}
+    <tr>
+        <td>{{ loop.index }}</td>
+        <td>
+            <strong>{{ item.descripcion }}</strong>
+            {% if item.brandName %}<br><small>{{ item.brandName }}{% if item.modelName %} — {{ item.modelName }}{% endif %}</small>{% endif %}
+            {% if item.code %}<br><small>Código: {{ item.code }}</small>{% endif %}
+        </td>
+        <td class="num">{{ item.cantidad|number_format(2, ',', '.') }} {{ item.unitCode }}</td>
+        <td class="num">${{ item.precio|number_format(2, ',', '.') }}</td>
+        <td class="num">${{ lineTax|number_format(2, ',', '.') }}</td>
+        <td class="num">${{ (item.cantidad * item.precio)|number_format(2, ',', '.') }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<div class="totals">
+    <table>
+        <tr>
+            <td>Subtotal (sin impuestos)</td>
+            <td class="num">${{ totals.taxExclusiveAmount|number_format(2, ',', '.') }}</td>
+        </tr>
+        {% if totals.allowanceTotalAmount > 0 %}
+        <tr>
+            <td>Descuentos</td>
+            <td class="num">- ${{ totals.allowanceTotalAmount|number_format(2, ',', '.') }}</td>
+        </tr>
+        {% endif %}
+        {% if totals.chargeTotalAmount > 0 %}
+        <tr>
+            <td>Recargos</td>
+            <td class="num">+ ${{ totals.chargeTotalAmount|number_format(2, ',', '.') }}</td>
+        </tr>
+        {% endif %}
+        {% for code, group in totals.taxGroups %}
+        <tr>
+            <td>{{ group.subtotals[0].name }} ({{ code }})</td>
+            <td class="num">${{ group.amount|number_format(2, ',', '.') }}</td>
+        </tr>
+        {% endfor %}
+        {% if totals.prepaidAmount > 0 %}
+        <tr>
+            <td>Anticipos</td>
+            <td class="num">- ${{ totals.prepaidAmount|number_format(2, ',', '.') }}</td>
+        </tr>
+        {% endif %}
+        <tr class="total">
+            <td>Total a pagar</td>
+            <td class="num">${{ totals.payableAmount|number_format(2, ',', '.') }} {{ doc.currencyCode }}</td>
+        </tr>
+    </table>
+</div>
+
+{% if qrCodeUrl %}
+<div class="qr">
+    <img alt="QR" src="https://api.qrserver.com/v1/create-qr-code/?size=130x130&data={{ qrCodeUrl|url_encode }}">
+</div>
+{% endif %}
+
+<div class="footer">
+    <p>
+        <strong>{{ idLabel }}:</strong>
+        <span class="uuid">{{ uuid }}</span>
+    </p>
+    <p>Representación gráfica de la {{ heading|lower }} generada por <strong>Royalty Fusion DIAN PHP</strong>.</p>
+</div>
+</body>
+</html>
