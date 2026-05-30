@@ -1,0 +1,9 @@
+parameters:
+    level: 6
+    paths:
+        - src
+        - tests
+    excludePaths:
+        - src/Xml/templates/*
+    ignoreErrors:
+        - identifier: missingType.iterableValue

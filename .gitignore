@@ -2,3 +2,10 @@
 /scratch/
 .DS_Store
 composer.lock
+/.phpunit.cache/
+/.phpunit.coverage/
+/.phpunit.result.cache
+/build/
+.phpstan.cache
+/docs/_build/
+/docs/site/

@@ -89,7 +89,7 @@ class DebitNote
         return $this;
     }
 
-    public function getClient(): ?client
+    public function getClient(): ?Client
     {
         return $this->client ?? null;
     }
