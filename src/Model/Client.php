@@ -6,6 +6,8 @@ namespace RoyaltyFusion\DianPhp\Model;
 
 class Client
 {
+    use HasPartyDetails;
+
     private string $tipoDocumento;
     private string $numeroDocumento;
     private string $razonSocial;

@@ -6,6 +6,8 @@ namespace RoyaltyFusion\DianPhp\Model;
 
 class DebitNote
 {
+    use HasRichDocumentFields;
+
     private string $prefijo;
     private string $numero;
     private \DateTimeInterface $fecha;
