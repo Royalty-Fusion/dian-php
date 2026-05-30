@@ -156,4 +156,108 @@ XML;
         }
         return '';
     }
+
+    /**
+     * Queries the DIAN web service for the current status of a previously
+     * sent document, by its trackId (the CUFE/CUDE).
+     */
+    public function getStatus(string $trackId): StatusResult
+    {
+        return $this->callStatus(
+            'http://wcf.dian.colombia/IWcfDianCustomerServices/GetStatus',
+            <<<XML
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:wcf="http://wcf.dian.colombia">
+   <soap:Header/>
+   <soap:Body>
+      <wcf:GetStatus>
+         <wcf:trackId>{$trackId}</wcf:trackId>
+      </wcf:GetStatus>
+   </soap:Body>
+</soap:Envelope>
+XML
+        );
+    }
+
+    /**
+     * Like getStatus() but also retrieves the b64-encoded ApplicationResponse
+     * zip and unpacks the embedded XML for the caller.
+     */
+    public function getStatusZip(string $trackId): StatusResult
+    {
+        return $this->callStatus(
+            'http://wcf.dian.colombia/IWcfDianCustomerServices/GetStatusZip',
+            <<<XML
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:wcf="http://wcf.dian.colombia">
+   <soap:Header/>
+   <soap:Body>
+      <wcf:GetStatusZip>
+         <wcf:trackId>{$trackId}</wcf:trackId>
+      </wcf:GetStatusZip>
+   </soap:Body>
+</soap:Envelope>
+XML
+            ,
+            true
+        );
+    }
+
+    private function callStatus(string $soapAction, string $envelope, bool $expectZip = false): StatusResult
+    {
+        $endpoint = $this->environment === self::ENV_PRODUCCION
+            ? self::ENDPOINT_PROD
+            : self::ENDPOINT_HAB;
+
+        $result = new StatusResult();
+        try {
+            $response = $this->httpClient->request('POST', $endpoint, [
+                'headers' => [
+                    'Content-Type' => 'application/soap+xml;charset=UTF-8;action="' . $soapAction . '"',
+                ],
+                'body' => $envelope,
+            ]);
+            $content = $response->getContent(false);
+
+            if (preg_match('/<b:IsValid[^>]*>(.*?)<\/b:IsValid>/', $content, $m)) {
+                $result->setIsValid(strtolower(trim($m[1])) === 'true');
+            }
+            if (preg_match('/<b:StatusCode[^>]*>(.*?)<\/b:StatusCode>/', $content, $m)) {
+                $result->setStatusCode(trim($m[1]));
+            }
+            if (preg_match('/<b:StatusDescription[^>]*>(.*?)<\/b:StatusDescription>/', $content, $m)) {
+                $result->setStatusDescription(trim($m[1]));
+            }
+            if (preg_match('/<b:StatusMessage[^>]*>(.*?)<\/b:StatusMessage>/', $content, $m)) {
+                $result->setStatusMessage(trim($m[1]));
+            }
+
+            // Collect error messages
+            if (preg_match_all('/<b:string[^>]*>(.*?)<\/b:string>/', $content, $errs)) {
+                $result->setErrorMessages(array_values(array_filter(array_map('trim', $errs[1]))));
+            }
+
+            if ($expectZip && preg_match('/<b:XmlBase64Bytes[^>]*>(.*?)<\/b:XmlBase64Bytes>/', $content, $m)) {
+                $zipContent = base64_decode($m[1]);
+                $zipFile    = tempnam(sys_get_temp_dir(), 'dian_ar_');
+                if ($zipFile !== false) {
+                    file_put_contents($zipFile, $zipContent);
+                    $zip = new \ZipArchive();
+                    if ($zip->open($zipFile) === true) {
+                        for ($i = 0; $i < $zip->numFiles; $i++) {
+                            $name = $zip->getNameIndex($i);
+                            if ($name !== false && str_ends_with(strtolower($name), '.xml')) {
+                                $result->setApplicationResponseXml((string) $zip->getFromIndex($i));
+                                break;
+                            }
+                        }
+                        $zip->close();
+                    }
+                    @unlink($zipFile);
+                }
+            }
+        } catch (\Throwable $th) {
+            $result->setStatusDescription('Transport error: ' . $th->getMessage());
+        }
+
+        return $result;
+    }
 }
