@@ -1,0 +1,51 @@
+services:
+  _defaults:
+    autowire: false
+    autoconfigure: false
+    public: false
+
+  RoyaltyFusion\DianPhp\Signer\XadesSigner:
+    arguments:
+      - '%dian.cert.path%'
+      - '%dian.cert.password%'
+
+  RoyaltyFusion\DianPhp\Ws\SoapClient:
+    arguments:
+      - '%dian.environment%'
+
+  RoyaltyFusion\DianPhp\Xml\CufeGenerator: ~
+  RoyaltyFusion\DianPhp\Xml\QrGenerator: ~
+
+  RoyaltyFusion\DianPhp\Xml\XmlBuilder:
+    arguments:
+      - null
+      - '%dian.environment%'
+
+  RoyaltyFusion\DianPhp\Validator\BusinessRuleValidator: ~
+
+  RoyaltyFusion\DianPhp\Report\HtmlReport:
+    arguments:
+      - null
+      - '%dian.report.logo_url%'
+      - '%dian.report.accent_color%'
+
+  RoyaltyFusion\DianPhp\Dian:
+    public: true
+    arguments:
+      - '%dian.cert.path%'
+      - '%dian.cert.password%'
+      - '%dian.environment%'
+    calls:
+      - [setSigner, ['@RoyaltyFusion\DianPhp\Signer\XadesSigner']]
+      - [setSoapClient, ['@RoyaltyFusion\DianPhp\Ws\SoapClient']]
+      - [setXmlBuilder, ['@RoyaltyFusion\DianPhp\Xml\XmlBuilder']]
+      - [setCufeGenerator, ['@RoyaltyFusion\DianPhp\Xml\CufeGenerator']]
+      - [setQrGenerator, ['@RoyaltyFusion\DianPhp\Xml\QrGenerator']]
+      - [setValidator, ['@RoyaltyFusion\DianPhp\Validator\BusinessRuleValidator']]
+      - [validateBeforeSend, ['%dian.validate_before_send%']]
+
+  # Console commands
+  RoyaltyFusion\DianPhp\Bridge\Symfony\Command\DianStatusCommand:
+    tags: ['console.command']
+    arguments:
+      - '@RoyaltyFusion\DianPhp\Ws\SoapClient'
