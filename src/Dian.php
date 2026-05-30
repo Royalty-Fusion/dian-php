@@ -94,7 +94,7 @@ class Dian
             $qrGen     = $this->qrGenerator ?? new QrGenerator();
             $qrCodeUrl = $qrGen->generate($document, $uuid, $this->environment === SoapClient::ENV_PRODUCCION);
 
-            $builder = $this->xmlBuilder ?? new XmlBuilder();
+            $builder = $this->xmlBuilder ?? new XmlBuilder(null, $envFlag);
             $xml     = $builder->build($document, $uuid, $qrCodeUrl);
 
             $signer    = $this->signer ?? new XadesSigner($this->certPath, $this->certPassword);
@@ -131,7 +131,7 @@ class Dian
         $uuid      = $cufeGen->generate($document, $keyOrPin, $envFlag);
         $qrCodeUrl = ($this->qrGenerator ?? new QrGenerator())
             ->generate($document, $uuid, $this->environment === SoapClient::ENV_PRODUCCION);
-        $xml       = ($this->xmlBuilder ?? new XmlBuilder())->build($document, $uuid, $qrCodeUrl);
+        $xml       = ($this->xmlBuilder ?? new XmlBuilder(null, $envFlag))->build($document, $uuid, $qrCodeUrl);
 
         return ($this->signer ?? new XadesSigner($this->certPath, $this->certPassword))->sign($xml);
     }

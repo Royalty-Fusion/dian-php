@@ -33,8 +33,14 @@ final class XmlBuilderTest extends TestCase
         $this->assertTrue($loaded, 'XmlBuilder produced malformed XML.');
 
         $this->assertSame('Invoice', $dom->documentElement->localName);
-        $this->assertStringContainsString('<cbc:UUID schemeName="CUFE-SHA384">', $xml);
+        $this->assertStringContainsString('<cbc:UUID schemeID="2" schemeName="CUFE-SHA384">', $xml);
         $this->assertStringContainsString('https://example.test/qr', $xml);
+        // Anexo V1.9 required fields
+        $this->assertStringContainsString('<cbc:UBLVersionID>UBL 2.1</cbc:UBLVersionID>', $xml);
+        $this->assertStringContainsString('<cbc:ProfileExecutionID>2</cbc:ProfileExecutionID>', $xml);
+        $this->assertStringContainsString('listAgencyID="195"', $xml);
+        $this->assertStringContainsString('<cac:LegalMonetaryTotal>', $xml);
+        $this->assertStringContainsString('<cbc:PayableAmount currencyID="COP">', $xml);
     }
 
     private function makeInvoice(): Invoice
