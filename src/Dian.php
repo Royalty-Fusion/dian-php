@@ -9,6 +9,7 @@ use RoyaltyFusion\DianPhp\Model\DebitNote;
 use RoyaltyFusion\DianPhp\Model\Invoice;
 use RoyaltyFusion\DianPhp\Model\Result;
 use RoyaltyFusion\DianPhp\Signer\XadesSigner;
+use RoyaltyFusion\DianPhp\Validator\BusinessRuleValidator;
 use RoyaltyFusion\DianPhp\Ws\SoapClient;
 use RoyaltyFusion\DianPhp\Xml\CufeGenerator;
 use RoyaltyFusion\DianPhp\Xml\QrGenerator;
@@ -28,11 +29,13 @@ class Dian
     private string $certPassword;
     private string $environment;
 
-    private ?XmlBuilder    $xmlBuilder    = null;
-    private ?CufeGenerator $cufeGenerator = null;
-    private ?QrGenerator   $qrGenerator   = null;
-    private ?XadesSigner   $signer        = null;
-    private ?SoapClient    $soapClient    = null;
+    private ?XmlBuilder             $xmlBuilder    = null;
+    private ?CufeGenerator          $cufeGenerator = null;
+    private ?QrGenerator            $qrGenerator   = null;
+    private ?XadesSigner            $signer        = null;
+    private ?SoapClient             $soapClient    = null;
+    private ?BusinessRuleValidator  $validator     = null;
+    private bool                    $validateBeforeSend = false;
 
     public function __construct(
         string $certPath,
@@ -74,12 +77,35 @@ class Dian
         return $this;
     }
 
+    public function setValidator(BusinessRuleValidator $validator): self
+    {
+        $this->validator = $validator;
+        return $this;
+    }
+
+    public function validateBeforeSend(bool $enabled = true): self
+    {
+        $this->validateBeforeSend = $enabled;
+        return $this;
+    }
+
     /**
      * Sign + send an Invoice, CreditNote or DebitNote to DIAN.
      */
     public function send(Invoice|CreditNote|DebitNote $document): Result
     {
         try {
+            if ($this->validateBeforeSend) {
+                $validator = $this->validator ?? new BusinessRuleValidator();
+                $validation = $validator->validate($document);
+                if (!$validation->isValid()) {
+                    $result = new Result();
+                    $result->setSuccess(false);
+                    $result->setErrorMessage(implode(' | ', $validation->messages()));
+                    return $result;
+                }
+            }
+
             $cufeGen = $this->cufeGenerator ?? new CufeGenerator();
             $envFlag = $this->environment === SoapClient::ENV_PRODUCCION
                 ? CufeGenerator::ENV_PRODUCCION
