@@ -7,16 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added (post-0.1.0)
-- 8 new SOAP operations on `SoapClient`: `sendBillSync`, `sendBillAttachmentAsync`,
-  `sendNominaSync`, `sendEventUpdateStatus`, `getAcquirer`, `getExchangeEmails`,
-  `getReferenceNotes`, `getStatusEvent`. Total: 13 SOAP operations supported.
-- New `docs/connections-reference.md` — full audit of every URL, SOAP action
-  URI, namespace and XAdES constant the SDK uses, cross-checked against
-  lopezsoft, Stenfrank, and the Siigo golden master.
-- Updated `docs/payroll.md` and `docs/radian.md` to reflect that Nómina and
-  RADIAN use the same VPFE endpoint (no `apifedi.dian.gov.co` mismatch).
-
 ### Pending
 - WS-Security `BinarySecurityToken` for production `SendBillSync` (header-level
   signature). Habilitación works without WSSE; Producción may require it.
@@ -44,13 +34,15 @@ First public release.
 - Handles documents with 1 or 2 `UBLExtensions` automatically.
 - Optional `SignerRole` (`supplier` / `third party` / `customer`).
 
-#### Web services
-- `SoapClient` over `symfony/http-client`:
-  - `SendBillAsync` (production flow)
-  - `SendTestSetAsync` (Habilitación)
-  - `GetStatus`, `GetStatusZip` (status query, returns ApplicationResponse XML)
-  - `GetNumberingRange` (authorised numbering ranges)
-  - `GetXmlByDocumentKey` (download signed XML by CUFE)
+#### Web services (13 SOAP operations)
+- `SoapClient` over `symfony/http-client` — every public DIAN operation:
+  - **Envío**: `SendBillAsync`, `SendBillSync`, `SendBillAttachmentAsync`,
+    `SendTestSetAsync`, `SendNominaSync`, `SendEventUpdateStatus`
+  - **Consulta**: `GetStatus`, `GetStatusZip`, `GetStatusEvent`,
+    `GetNumberingRange`, `GetXmlByDocumentKey`, `GetAcquirer`,
+    `GetExchangeEmails`, `GetReferenceNotes`
+- Single VPFE endpoint (`vpfe.dian.gov.co` Prod, `vpfe-hab.dian.gov.co` Hab)
+  serves every document family — Factura, NC/ND, DS, Nómina, RADIAN.
 
 #### Catalogs
 - 16 typed PHP enums for canonical DIAN codes (TipoDocumento, Responsabilidad, Tributo, FormaPago, MedioPago, UnidadMedida, Moneda, TipoFactura, TipoOperacion, etc.).
@@ -75,10 +67,12 @@ First public release.
 - Symfony bundle (`src/Bridge/Symfony/`) with autowiring, YAML configuration, `dian:status` console command.
 
 #### Tooling and quality
-- PHPUnit 11 — 71 tests / 305 assertions, all green.
+- PHPUnit 11 — 79 tests / 321 assertions, all green.
 - PHPStan level 6.
 - GitHub Actions CI matrix: PHP 8.1 / 8.2 / 8.3 / 8.4 × Symfony 6.4 / 7.1.
-- Public documentation set under `docs/` (15 markdown guides).
+- Public documentation set under `docs/` (17 markdown guides) including the
+  full `connections-reference.md` audit of every URL, SOAP action URI,
+  namespace and XAdES constant the SDK emits.
 - 7 runnable examples in `examples/`.
 
 ### Credits
