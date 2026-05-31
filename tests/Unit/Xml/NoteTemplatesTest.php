@@ -28,7 +28,7 @@ final class NoteTemplatesTest extends TestCase
         $this->assertSame('CreditNote', $dom->documentElement->localName);
 
         $this->assertStringContainsString('<cbc:CustomizationID>20</cbc:CustomizationID>', $xml);
-        $this->assertStringContainsString('<cbc:UUID schemeID="2" schemeName="CUDE-SHA384">', $xml);
+        $this->assertStringContainsString('<cbc:UUID schemeID="1" schemeName="CUDE-SHA384">', $xml);
         $this->assertStringContainsString('<cac:BillingReference>', $xml);
         $this->assertStringContainsString('<cac:DiscrepancyResponse>', $xml);
         $this->assertStringContainsString('<cac:LegalMonetaryTotal>', $xml);

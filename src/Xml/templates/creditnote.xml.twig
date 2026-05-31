@@ -37,7 +37,7 @@
     <cbc:ProfileID>DIAN 2.1: Nota Crédito de Factura Electrónica de Venta</cbc:ProfileID>
     <cbc:ProfileExecutionID>{{ profileExecId }}</cbc:ProfileExecutionID>
     <cbc:ID>{{ doc.prefijo }}{{ doc.numero }}</cbc:ID>
-    <cbc:UUID schemeID="2" schemeName="CUDE-SHA384">{{ cude }}</cbc:UUID>
+    <cbc:UUID schemeID="{{ uuidSchemeId }}" schemeName="CUDE-SHA384">{{ cude }}</cbc:UUID>
     <cbc:IssueDate>{{ doc.fecha|date('Y-m-d') }}</cbc:IssueDate>
     <cbc:IssueTime>{{ doc.fecha|date('H:i:sP') }}</cbc:IssueTime>
     <cbc:CreditNoteTypeCode listAgencyID="195" listAgencyName="CO, DIAN (Dirección de Impuestos y Aduanas Nacionales)" listSchemeURI="urn:oasis:names:specification:ubl:codelist:gc:CreditNoteTypeCode-2.1">91</cbc:CreditNoteTypeCode>
@@ -179,6 +179,17 @@
         {% if payment.dueDate %}<cbc:PaymentDueDate>{{ payment.dueDate|date('Y-m-d') }}</cbc:PaymentDueDate>{% endif %}
     </cac:PaymentMeans>
     {% endfor %}
+
+    {% if doc.paymentExchangeRate %}
+    <cac:PaymentExchangeRate>
+        <cbc:SourceCurrencyCode>{{ doc.paymentExchangeRate.sourceCurrencyCode }}</cbc:SourceCurrencyCode>
+        <cbc:SourceCurrencyBaseRate>{{ doc.paymentExchangeRate.sourceCurrencyBaseRate|number_format(2, '.', '') }}</cbc:SourceCurrencyBaseRate>
+        <cbc:TargetCurrencyCode>{{ doc.paymentExchangeRate.targetCurrencyCode }}</cbc:TargetCurrencyCode>
+        <cbc:TargetCurrencyBaseRate>{{ doc.paymentExchangeRate.targetCurrencyBaseRate|number_format(2, '.', '') }}</cbc:TargetCurrencyBaseRate>
+        <cbc:CalculationRate>{{ doc.paymentExchangeRate.calculationRate|number_format(2, '.', '') }}</cbc:CalculationRate>
+        {% if doc.paymentExchangeRate.date %}<cbc:Date>{{ doc.paymentExchangeRate.date|date('Y-m-d') }}</cbc:Date>{% endif %}
+    </cac:PaymentExchangeRate>
+    {% endif %}
 
     {% for ac in doc.allowanceCharges %}
     <cac:AllowanceCharge>

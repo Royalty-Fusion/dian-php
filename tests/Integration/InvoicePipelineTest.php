@@ -68,7 +68,7 @@ final class InvoicePipelineTest extends TestCase
         $this->assertStringContainsString('<cac:WithholdingTaxTotal>', $xml);
         $this->assertStringContainsString('<cac:PhysicalLocation>', $xml);
         $this->assertStringContainsString('<cbc:CountrySubentityCode>11</cbc:CountrySubentityCode>', $xml);
-        $this->assertStringContainsString('<cbc:UUID schemeID="2" schemeName="CUFE-SHA384">' . $uuid, $xml);
+        $this->assertStringContainsString('<cbc:UUID schemeID="1" schemeName="CUFE-SHA384">' . $uuid, $xml);
 
         // 5. Render report HTML
         $html = (new HtmlReport())->render($invoice, $uuid, $qrUrl);

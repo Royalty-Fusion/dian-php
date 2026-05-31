@@ -27,13 +27,25 @@ class XadesSigner
     public const POLICY_HASH_SHA256  = 'dMoQAOR5HscatV9QLJ864wS6u2bM=';
     public const POLICY_DESCRIPTION  = 'Política de firma para facturas electrónicas de la República de Colombia';
 
+    public const ROLE_SUPPLIER    = 'supplier';
+    public const ROLE_THIRD_PARTY = 'third party';
+    public const ROLE_CUSTOMER    = 'customer';
+
     private string $certPath;
     private string $password;
+    private ?string $signerRole;
 
-    public function __construct(string $certPath, string $password)
+    /**
+     * @param  string|null  $signerRole  When non-null, emits a
+     *  <xades:SignerRole><xades:ClaimedRoles> block. Use ROLE_THIRD_PARTY when
+     *  signing on behalf of the issuer (typical for facturadores tecnológicos
+     *  like Siigo), ROLE_SUPPLIER when the issuer signs with its own cert.
+     */
+    public function __construct(string $certPath, string $password, ?string $signerRole = null)
     {
-        $this->certPath = $certPath;
-        $this->password = $password;
+        $this->certPath   = $certPath;
+        $this->password   = $password;
+        $this->signerRole = $signerRole;
     }
 
     /**
@@ -154,6 +166,17 @@ class XadesSigner
 
         $sigPolicyId->appendChild($sigPolicyIdNode);
         $signedSigProps->appendChild($sigPolicyId);
+
+        // Optional SignerRole — recommended for third-party facturadores tecnológicos
+        if ($this->signerRole !== null) {
+            $signerRole   = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:SignerRole');
+            $claimedRoles = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:ClaimedRoles');
+            $claimedRoles->appendChild(
+                $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:ClaimedRole', $this->signerRole)
+            );
+            $signerRole->appendChild($claimedRoles);
+            $signedSigProps->appendChild($signerRole);
+        }
 
         $signedProps->appendChild($signedSigProps);
         $qualProps->appendChild($signedProps);

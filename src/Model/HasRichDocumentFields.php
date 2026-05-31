@@ -25,6 +25,7 @@ trait HasRichDocumentFields
 
     private string $currencyCode = 'COP';
     private float $exchangeRate = 0.0;
+    private ?ExchangeRate $paymentExchangeRate = null;
 
     public function addAllowanceCharge(AllowanceCharge $allowanceCharge): self
     {
@@ -94,5 +95,16 @@ trait HasRichDocumentFields
     public function getExchangeRate(): float
     {
         return $this->exchangeRate;
+    }
+
+    public function setPaymentExchangeRate(ExchangeRate $paymentExchangeRate): self
+    {
+        $this->paymentExchangeRate = $paymentExchangeRate;
+        return $this;
+    }
+
+    public function getPaymentExchangeRate(): ?ExchangeRate
+    {
+        return $this->paymentExchangeRate;
     }
 }

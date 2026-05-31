@@ -29,6 +29,8 @@ enum MedioPago: string implements DianCatalogInterface
     case CUPON                          = '67';
     case BANCARIO_INTERNO               = '70';
     case COMPENSACION                   = '97';
+    /** Sin definir — usado típicamente para clientes extranjeros (validado en producción por Siigo). */
+    case OTRO                           = 'ZZZ';
 
     public function description(): string
     {
@@ -47,6 +49,7 @@ enum MedioPago: string implements DianCatalogInterface
             self::CUPON                    => 'Cupón',
             self::BANCARIO_INTERNO         => 'Bancario interno',
             self::COMPENSACION             => 'Compensación de deudas',
+            self::OTRO                     => 'Otro / Sin definir',
         };
     }
 }

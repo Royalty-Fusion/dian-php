@@ -51,7 +51,7 @@
     <cbc:ProfileID>DIAN 2.1: Factura Electrónica de Venta</cbc:ProfileID>
     <cbc:ProfileExecutionID>{{ profileExecId }}</cbc:ProfileExecutionID>
     <cbc:ID>{{ doc.prefijo }}{{ doc.numero }}</cbc:ID>
-    <cbc:UUID schemeID="2" schemeName="CUFE-SHA384">{{ cufe }}</cbc:UUID>
+    <cbc:UUID schemeID="{{ uuidSchemeId }}" schemeName="CUFE-SHA384">{{ cufe }}</cbc:UUID>
     <cbc:IssueDate>{{ doc.fecha|date('Y-m-d') }}</cbc:IssueDate>
     <cbc:IssueTime>{{ doc.fecha|date('H:i:sP') }}</cbc:IssueTime>
     <cbc:InvoiceTypeCode listAgencyID="195" listAgencyName="CO, DIAN (Dirección de Impuestos y Aduanas Nacionales)" listSchemeURI="urn:oasis:names:specification:ubl:codelist:gc:InvoiceTypeCode-2.1">01</cbc:InvoiceTypeCode>
@@ -213,6 +213,19 @@
     </cac:PaymentMeans>
     {% endfor %}
 
+    {% if doc.paymentExchangeRate %}
+    <cac:PaymentExchangeRate>
+        <cbc:SourceCurrencyCode>{{ doc.paymentExchangeRate.sourceCurrencyCode }}</cbc:SourceCurrencyCode>
+        <cbc:SourceCurrencyBaseRate>{{ doc.paymentExchangeRate.sourceCurrencyBaseRate|number_format(2, '.', '') }}</cbc:SourceCurrencyBaseRate>
+        <cbc:TargetCurrencyCode>{{ doc.paymentExchangeRate.targetCurrencyCode }}</cbc:TargetCurrencyCode>
+        <cbc:TargetCurrencyBaseRate>{{ doc.paymentExchangeRate.targetCurrencyBaseRate|number_format(2, '.', '') }}</cbc:TargetCurrencyBaseRate>
+        <cbc:CalculationRate>{{ doc.paymentExchangeRate.calculationRate|number_format(2, '.', '') }}</cbc:CalculationRate>
+        {% if doc.paymentExchangeRate.date %}
+        <cbc:Date>{{ doc.paymentExchangeRate.date|date('Y-m-d') }}</cbc:Date>
+        {% endif %}
+    </cac:PaymentExchangeRate>
+    {% endif %}
+
     {% for prepayment in doc.prepayments %}
     <cac:PrepaidPayment>
         <cbc:ID>{{ prepayment.id }}</cbc:ID>
@@ -236,6 +249,7 @@
     {% for taxCode, group in totals.taxGroups %}
     <cac:TaxTotal>
         <cbc:TaxAmount currencyID="{{ doc.currencyCode }}">{{ group.amount|number_format(2, '.', '') }}</cbc:TaxAmount>
+        <cbc:RoundingAmount currencyID="{{ doc.currencyCode }}">0.00</cbc:RoundingAmount>
         {% for sub in group.subtotals %}
         <cac:TaxSubtotal>
             <cbc:TaxableAmount currencyID="{{ doc.currencyCode }}">{{ sub.base|number_format(2, '.', '') }}</cbc:TaxableAmount>

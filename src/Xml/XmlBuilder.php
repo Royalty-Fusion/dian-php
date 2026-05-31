@@ -21,9 +21,19 @@ class XmlBuilder
 {
     private Environment $twig;
     private string $environment;
+    private string $uuidSchemeId;
 
-    public function __construct(?Environment $twig = null, string $environment = TipoAmbiente::HABILITACION->value)
-    {
+    /**
+     * @param  string  $uuidSchemeId  '1' (matches Siigo and most production
+     *                                facturadores) or '2' (post-Anexo V1.9
+     *                                hashing scheme). Default '1' since that
+     *                                is what real-world DIAN traffic uses.
+     */
+    public function __construct(
+        ?Environment $twig = null,
+        string $environment = TipoAmbiente::HABILITACION->value,
+        string $uuidSchemeId = '1'
+    ) {
         if ($twig instanceof Environment) {
             $this->twig = $twig;
         } else {
@@ -33,7 +43,8 @@ class XmlBuilder
                 'strict_variables' => false,
             ]);
         }
-        $this->environment = $environment;
+        $this->environment  = $environment;
+        $this->uuidSchemeId = $uuidSchemeId;
     }
 
     /**
@@ -61,6 +72,7 @@ class XmlBuilder
             'totals'        => $totals,
             'environment'   => $this->environment,
             'profileExecId' => $this->environment,
+            'uuidSchemeId'  => $this->uuidSchemeId,
         ]);
     }
 }
