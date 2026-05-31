@@ -260,4 +260,84 @@ XML
 
         return $result;
     }
+
+    /**
+     * Consulta los rangos de numeración autorizados para una empresa.
+     *
+     * @param string $accountCode   NIT de la empresa (sin DV)
+     * @param string $accountCodeT  NIT del proveedor tecnológico
+     * @param string $softwareCode  Identificador del software DIAN (UUID)
+     */
+    public function getNumberingRange(string $accountCode, string $accountCodeT, string $softwareCode): string
+    {
+        $endpoint = $this->environment === self::ENV_PRODUCCION
+            ? self::ENDPOINT_PROD
+            : self::ENDPOINT_HAB;
+
+        $soapAction = 'http://wcf.dian.colombia/IWcfDianCustomerServices/GetNumberingRange';
+        $envelope = <<<XML
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:wcf="http://wcf.dian.colombia">
+   <soap:Header/>
+   <soap:Body>
+      <wcf:GetNumberingRange>
+         <wcf:accountCode>{$accountCode}</wcf:accountCode>
+         <wcf:accountCodeT>{$accountCodeT}</wcf:accountCodeT>
+         <wcf:softwareCode>{$softwareCode}</wcf:softwareCode>
+      </wcf:GetNumberingRange>
+   </soap:Body>
+</soap:Envelope>
+XML;
+
+        try {
+            $response = $this->httpClient->request('POST', $endpoint, [
+                'headers' => [
+                    'Content-Type' => 'application/soap+xml;charset=UTF-8;action="' . $soapAction . '"',
+                ],
+                'body' => $envelope,
+            ]);
+            return (string) $response->getContent(false);
+        } catch (\Throwable $th) {
+            return '<error>' . htmlspecialchars($th->getMessage(), ENT_XML1) . '</error>';
+        }
+    }
+
+    /**
+     * Descarga el XML de un documento por su CUFE/CUDE.
+     *
+     * Returns the raw XML string of the signed document if found, else empty.
+     */
+    public function getXmlByDocumentKey(string $trackId): string
+    {
+        $endpoint = $this->environment === self::ENV_PRODUCCION
+            ? self::ENDPOINT_PROD
+            : self::ENDPOINT_HAB;
+
+        $soapAction = 'http://wcf.dian.colombia/IWcfDianCustomerServices/GetXmlByDocumentKey';
+        $envelope = <<<XML
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:wcf="http://wcf.dian.colombia">
+   <soap:Header/>
+   <soap:Body>
+      <wcf:GetXmlByDocumentKey>
+         <wcf:trackId>{$trackId}</wcf:trackId>
+      </wcf:GetXmlByDocumentKey>
+   </soap:Body>
+</soap:Envelope>
+XML;
+
+        try {
+            $response = $this->httpClient->request('POST', $endpoint, [
+                'headers' => [
+                    'Content-Type' => 'application/soap+xml;charset=UTF-8;action="' . $soapAction . '"',
+                ],
+                'body' => $envelope,
+            ]);
+            $content = $response->getContent(false);
+            if (preg_match('/<b:XmlBase64Bytes[^>]*>(.*?)<\/b:XmlBase64Bytes>/', $content, $m)) {
+                return (string) base64_decode($m[1]);
+            }
+            return '';
+        } catch (\Throwable) {
+            return '';
+        }
+    }
 }
