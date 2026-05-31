@@ -24,6 +24,10 @@ use RoyaltyFusion\DianPhp\Model\Tax;
  *   - CudsGenerator (variant of CufeGenerator)
  *   - Adjustment Note (TipoDocumento=95) sister model + template
  *   - Wiring inside Dian facade with separate send() overload
+ *   - Adjustment Note (TipoDocumento=95) sister model
+ *
+ * NOTE: Template, CUDS generator and builder are now implemented under
+ * src/SupportDocument/{CudsGenerator,SupportDocumentBuilder,templates/}.
  */
 class SupportDocument
 {

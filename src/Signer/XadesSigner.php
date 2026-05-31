@@ -208,15 +208,31 @@ class XadesSigner
             $keyInfoNode->setAttribute('Id', $keyInfoId);
         }
 
-        // Inject ds:Signature inside the second ext:ExtensionContent placeholder
+        // Pick the last EMPTY <ext:ExtensionContent> walking from the end.
+        // DIAN documents use two conventions:
+        //   * Invoice / CreditNote / DebitNote / DocumentSupport
+        //       -> 2 UBLExtensions (DIAN extension #0 + empty signature slot #1)
+        //   * AttachedDocument / ApplicationResponse
+        //       -> 1 UBLExtension (empty signature slot at #0)
         $extNodes = $dom->getElementsByTagNameNS(
             'urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2',
             'ExtensionContent'
         );
 
-        if ($extNodes->length > 1) {
-            $extContent = $extNodes->item(1);
-            $extContent->appendChild($dom->importNode($sigNode, true));
+        $target = null;
+        for ($i = $extNodes->length - 1; $i >= 0; $i--) {
+            $candidate = $extNodes->item($i);
+            if ($candidate instanceof \DOMElement && trim($candidate->textContent) === '') {
+                $target = $candidate;
+                break;
+            }
+        }
+        if ($target === null && $extNodes->length > 0) {
+            $target = $extNodes->item($extNodes->length - 1);
+        }
+
+        if ($target instanceof \DOMElement) {
+            $target->appendChild($dom->importNode($sigNode, true));
         } else {
             $dom->documentElement->appendChild($dom->importNode($sigNode, true));
         }
