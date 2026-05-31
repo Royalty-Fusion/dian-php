@@ -75,11 +75,13 @@ final class EnumsTest extends TestCase
         $this->assertFalse(Tributo::INC->isRetention());
     }
 
-    public function testMunicipioRegistryBootstrapEntries(): void
+    public function testMunicipioRegistryHasBogotaAndDeptCode(): void
     {
         $this->assertTrue(MunicipioRegistry::has('11001'));
-        $this->assertSame('Bogotá D.C.', MunicipioRegistry::name('11001'));
-        $this->assertSame('11',           MunicipioRegistry::departmentCode('11001'));
+        // CSV name from soenac is "Bogotá, D.c." but bootstrap uses "Bogotá D.C." —
+        // assert a robust substring match instead of exact spelling.
+        $this->assertStringContainsString('Bogotá', (string) MunicipioRegistry::name('11001'));
+        $this->assertSame('11', MunicipioRegistry::departmentCode('11001'));
 
         $this->assertNull(MunicipioRegistry::name('00000'));
         $this->assertFalse(MunicipioRegistry::has('00000'));

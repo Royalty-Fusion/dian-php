@@ -34,6 +34,23 @@ shape, payroll concatenation strings, etc.):
   Stenfrank — the OG Colombian XAdES PHP SDK. Used as a sanity check for
   the base `SignInvoice` flow.
 
+* **[soenac/api-dian](https://github.com/soenac/api-dian)** (LGPL-3.0) by
+  Soenac. Studied for the REST API surface (route shape, controller
+  conventions) reflected in `docs/rest-api-blueprint.md`. We also vendor
+  the public-domain DIAN/DANE/UN-CEFACT/ISO catalog CSVs they had already
+  consolidated under `public/csv/` — see next section.
+
+## Public-domain DIAN/DANE catalogs
+
+The CSV files under `resources/catalogs/` (municipalities, countries,
+unit_measures, type_currencies, type_liabilities, payment_methods,
+languages, type_*) are public official codes published by DIAN, DANE,
+UN/ECE and ISO. We retrieved the consolidated CSVs from soenac/api-dian
+(LGPL-3.0). The *data* in these CSVs is public information — copyright
+does not apply to factual codes — so vendoring them in our MIT package
+is legally clean. We did **not** import any LGPL PHP code from that
+project; the registry loaders are written from scratch in our own style.
+
 ## Production fixtures
 
 * **Siigo Nube** — the AttachedDocument XML at

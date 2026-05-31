@@ -65,16 +65,22 @@ final class MunicipioRegistry
             '99001' => ['Puerto Carreño', '99'],
         ];
 
-        // If a CSV file is present, hydrate from it (overrides the bootstrap rows).
-        $csvFile = __DIR__ . '/../../resources/catalogs/municipios.csv';
+        // Hydrate from resources/catalogs/municipalities.csv if present.
+        // Format: TSV (tab-separated), no header, columns:
+        //   id  department_id  name  code
+        // where code is the 5-digit DANE municipality code.
+        $csvFile = __DIR__ . '/../../resources/catalogs/municipalities.csv';
         if (is_file($csvFile)) {
             $handle = fopen($csvFile, 'r');
             if ($handle !== false) {
-                // Expected columns: codigo,nombre,depto
-                fgetcsv($handle); // skip header
-                while (($row = fgetcsv($handle)) !== false) {
-                    if (count($row) >= 3) {
-                        self::$data[$row[0]] = [$row[1], $row[2]];
+                while (($row = fgetcsv($handle, 0, "\t")) !== false) {
+                    if (count($row) >= 4) {
+                        $code   = trim($row[3]);
+                        $name   = trim($row[2]);
+                        $deptId = trim($row[1]);
+                        // Convert soenac department_id to DANE 2-digit code via known mapping
+                        $deptCode = self::departmentIdToDaneCode($deptId);
+                        self::$data[$code] = [$name, $deptCode];
                     }
                 }
                 fclose($handle);
@@ -107,5 +113,26 @@ final class MunicipioRegistry
             $out[$code] = $row[0];
         }
         return $out;
+    }
+
+    /**
+     * Maps the soenac/api-dian department row ID to the DANE 2-digit code.
+     * The CSV ships department_id as the row PK, not the DANE code.
+     *
+     * @var array<string,string>
+     */
+    private const DEPT_ID_TO_DANE = [
+        '1'  => '91', '2'  => '05', '3'  => '81', '4'  => '08', '5'  => '11',
+        '6'  => '13', '7'  => '15', '8'  => '17', '9'  => '18', '10' => '85',
+        '11' => '19', '12' => '20', '13' => '27', '14' => '23', '15' => '25',
+        '16' => '94', '17' => '95', '18' => '41', '19' => '44', '20' => '47',
+        '21' => '50', '22' => '52', '23' => '54', '24' => '86', '25' => '63',
+        '26' => '66', '27' => '88', '28' => '68', '29' => '70', '30' => '73',
+        '31' => '76', '32' => '97', '33' => '99',
+    ];
+
+    private static function departmentIdToDaneCode(string $deptId): string
+    {
+        return self::DEPT_ID_TO_DANE[$deptId] ?? $deptId;
     }
 }
