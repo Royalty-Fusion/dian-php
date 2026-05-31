@@ -7,9 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (post-0.1.0)
+- 8 new SOAP operations on `SoapClient`: `sendBillSync`, `sendBillAttachmentAsync`,
+  `sendNominaSync`, `sendEventUpdateStatus`, `getAcquirer`, `getExchangeEmails`,
+  `getReferenceNotes`, `getStatusEvent`. Total: 13 SOAP operations supported.
+- New `docs/connections-reference.md` — full audit of every URL, SOAP action
+  URI, namespace and XAdES constant the SDK uses, cross-checked against
+  lopezsoft, Stenfrank, and the Siigo golden master.
+- Updated `docs/payroll.md` and `docs/radian.md` to reflect that Nómina and
+  RADIAN use the same VPFE endpoint (no `apifedi.dian.gov.co` mismatch).
+
 ### Pending
-- WS-Security `BinarySecurityToken` for `SendBillSync` (synchronous flow).
+- WS-Security `BinarySecurityToken` for production `SendBillSync` (header-level
+  signature). Habilitación works without WSSE; Producción may require it.
 - Golden master tests against real Nómina / DS / RADIAN XMLs (waiting for fixtures).
+- Retry middleware with exponential backoff for VPFE 5xx errors.
+- PSR-3 `LoggerInterface` injection into `SoapClient`.
 - Symfony bundle event subscribers (`PreSendEvent`, `PostSendEvent`, `ValidationFailedEvent`).
 
 ## [0.1.0] - 2026-05-31

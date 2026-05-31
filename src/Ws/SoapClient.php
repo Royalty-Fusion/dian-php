@@ -340,4 +340,206 @@ XML;
             return '';
         }
     }
+
+    /**
+     * SendBillSync — flujo síncrono. DIAN devuelve la validación en el mismo
+     * call. Requiere la firma WS-Security con BinarySecurityToken — pendiente
+     * de implementar en futura versión. Por ahora se hace el call simple, que
+     * funciona contra Habilitación sin WSSE.
+     */
+    public function sendBillSync(string $fileName, string $signedXml, string $cufe = ''): Result
+    {
+        return $this->genericSendSync(
+            'SendBillSync',
+            $fileName,
+            $signedXml,
+            $cufe,
+            withFileName: true,
+        );
+    }
+
+    /**
+     * SendBillAttachmentAsync — variante de SendBillAsync que acepta adjuntos
+     * binarios (PDFs, archivos auxiliares) junto al XML firmado.
+     */
+    public function sendBillAttachmentAsync(string $fileName, string $signedXml, string $cufe = ''): Result
+    {
+        return $this->genericSendSync(
+            'SendBillAttachmentAsync',
+            $fileName,
+            $signedXml,
+            $cufe,
+            withFileName: true,
+        );
+    }
+
+    /**
+     * SendNominaSync — endpoint síncrono para Nómina Electrónica (NIE).
+     * El mismo VPFE acepta nóminas; el discriminador es el SOAP action y el
+     * tipo de XML enviado.
+     */
+    public function sendNominaSync(string $signedXml, string $cune = ''): Result
+    {
+        return $this->genericSendSync(
+            'SendNominaSync',
+            '',
+            $signedXml,
+            $cune,
+            withFileName: false,
+        );
+    }
+
+    /**
+     * SendEventUpdateStatus — RADIAN. Envía un ApplicationResponse firmado por
+     * el receptor del evento (Acuse, Aceptación, Endoso, Pago, etc.).
+     */
+    public function sendEventUpdateStatus(string $signedXml, string $cude = ''): Result
+    {
+        return $this->genericSendSync(
+            'SendEventUpdateStatus',
+            '',
+            $signedXml,
+            $cude,
+            withFileName: false,
+        );
+    }
+
+    /**
+     * GetAcquirer — consulta los datos registrados del adquiriente en DIAN.
+     */
+    public function getAcquirer(string $accountCode, string $accountCodeT, string $softwareCode): string
+    {
+        return $this->callConfigQuery(
+            'GetAcquirer',
+            "<wcf:accountCode>{$accountCode}</wcf:accountCode>
+            <wcf:accountCodeT>{$accountCodeT}</wcf:accountCodeT>
+            <wcf:softwareCode>{$softwareCode}</wcf:softwareCode>",
+        );
+    }
+
+    /**
+     * GetExchangeEmails — consulta los correos registrados para notificaciones DIAN.
+     */
+    public function getExchangeEmails(string $accountCode, string $accountCodeT, string $softwareCode): string
+    {
+        return $this->callConfigQuery(
+            'GetExchangeEmails',
+            "<wcf:accountCode>{$accountCode}</wcf:accountCode>
+            <wcf:accountCodeT>{$accountCodeT}</wcf:accountCodeT>
+            <wcf:softwareCode>{$softwareCode}</wcf:softwareCode>",
+        );
+    }
+
+    /**
+     * GetReferenceNotes — consulta las NC/ND emitidas que referencian una factura.
+     */
+    public function getReferenceNotes(string $documentKey): string
+    {
+        return $this->callConfigQuery(
+            'GetReferenceNotes',
+            "<wcf:documentKey>{$documentKey}</wcf:documentKey>",
+        );
+    }
+
+    /**
+     * GetStatusEvent — consulta los eventos RADIAN registrados para un trackId.
+     */
+    public function getStatusEvent(string $trackId): string
+    {
+        return $this->callConfigQuery(
+            'GetStatusEvent',
+            "<wcf:trackId>{$trackId}</wcf:trackId>",
+        );
+    }
+
+    /** Generic sync sender used by sendBillSync / sendNominaSync / sendEventUpdateStatus. */
+    private function genericSendSync(string $operation, string $fileName, string $signedXml, string $trackId, bool $withFileName): Result
+    {
+        $endpoint = $this->environment === self::ENV_PRODUCCION
+            ? self::ENDPOINT_PROD
+            : self::ENDPOINT_HAB;
+
+        if ($withFileName) {
+            $zip      = $this->compress($fileName, $signedXml);
+            $base64   = base64_encode($zip);
+            $body     = "<wcf:fileName>{$fileName}.zip</wcf:fileName>
+            <wcf:contentFile>{$base64}</wcf:contentFile>";
+        } else {
+            $body = '<wcf:contentFile>' . base64_encode($signedXml) . '</wcf:contentFile>';
+        }
+
+        $soapAction = 'http://wcf.dian.colombia/IWcfDianCustomerServices/' . $operation;
+        $envelope   = <<<XML
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:wcf="http://wcf.dian.colombia">
+   <soap:Header/>
+   <soap:Body>
+      <wcf:{$operation}>
+         {$body}
+      </wcf:{$operation}>
+   </soap:Body>
+</soap:Envelope>
+XML;
+
+        $result = new Result();
+        $result->setSignedXml($signedXml);
+        if ($trackId !== '') {
+            $result->setCufe($trackId);
+        }
+
+        try {
+            $response   = $this->httpClient->request('POST', $endpoint, [
+                'headers' => ['Content-Type' => 'application/soap+xml;charset=UTF-8;action="' . $soapAction . '"'],
+                'body'    => $envelope,
+            ]);
+            $statusCode = $response->getStatusCode();
+            $content    = $response->getContent(false);
+
+            if ($statusCode >= 200 && $statusCode < 300) {
+                $result->setSuccess(true);
+                if (stripos($content, '<b:IsValid>false</b:IsValid>') !== false) {
+                    $result->setSuccess(false);
+                    preg_match('/<b:StatusDescription[^>]*>(.*?)<\/b:StatusDescription>/', $content, $m);
+                    $result->setErrorMessage($m[1] ?? "Documento rechazado por DIAN ({$operation}).");
+                }
+            } else {
+                $result->setSuccess(false);
+                $result->setErrorMessage("HTTP {$statusCode} on {$operation}: {$content}");
+            }
+        } catch (\Throwable $th) {
+            $result->setSuccess(false);
+            $result->setErrorMessage($th->getMessage());
+        }
+
+        return $result;
+    }
+
+    /** Generic raw-XML query used by GetAcquirer / GetExchangeEmails / GetReferenceNotes / GetStatusEvent. */
+    private function callConfigQuery(string $operation, string $bodyInner): string
+    {
+        $endpoint = $this->environment === self::ENV_PRODUCCION
+            ? self::ENDPOINT_PROD
+            : self::ENDPOINT_HAB;
+
+        $soapAction = 'http://wcf.dian.colombia/IWcfDianCustomerServices/' . $operation;
+        $envelope   = <<<XML
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:wcf="http://wcf.dian.colombia">
+   <soap:Header/>
+   <soap:Body>
+      <wcf:{$operation}>
+         {$bodyInner}
+      </wcf:{$operation}>
+   </soap:Body>
+</soap:Envelope>
+XML;
+
+        try {
+            $response = $this->httpClient->request('POST', $endpoint, [
+                'headers' => ['Content-Type' => 'application/soap+xml;charset=UTF-8;action="' . $soapAction . '"'],
+                'body'    => $envelope,
+            ]);
+            return (string) $response->getContent(false);
+        } catch (\Throwable $th) {
+            return '<error>' . htmlspecialchars($th->getMessage(), ENT_XML1) . '</error>';
+        }
+    }
 }

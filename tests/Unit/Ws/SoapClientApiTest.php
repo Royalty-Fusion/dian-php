@@ -40,4 +40,31 @@ final class SoapClientApiTest extends TestCase
         $this->assertTrue($r->hasMethod('getStatus'));
         $this->assertTrue($r->hasMethod('getStatusZip'));
     }
+
+    /** @dataProvider newOperationsProvider */
+    public function testAllReferenceOperationsExist(string $method, int $expectedRequired): void
+    {
+        $r = new \ReflectionClass(SoapClient::class);
+        $this->assertTrue($r->hasMethod($method), "Method $method should exist on SoapClient.");
+        $this->assertSame(
+            $expectedRequired,
+            $r->getMethod($method)->getNumberOfRequiredParameters(),
+            "Method $method required-params mismatch."
+        );
+    }
+
+    /** @return array<string,array{0:string,1:int}> */
+    public static function newOperationsProvider(): array
+    {
+        return [
+            'sendBillSync'             => ['sendBillSync',             2],
+            'sendBillAttachmentAsync'  => ['sendBillAttachmentAsync',  2],
+            'sendNominaSync'           => ['sendNominaSync',           1],
+            'sendEventUpdateStatus'    => ['sendEventUpdateStatus',    1],
+            'getAcquirer'              => ['getAcquirer',              3],
+            'getExchangeEmails'        => ['getExchangeEmails',        3],
+            'getReferenceNotes'        => ['getReferenceNotes',        1],
+            'getStatusEvent'           => ['getStatusEvent',           1],
+        ];
+    }
 }

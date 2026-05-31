@@ -54,9 +54,25 @@ $xml = (new ApplicationResponseBuilder())->build($evento);
   original — usa un certificado distinto.
 * No lleva `LegalMonetaryTotal` ni líneas.
 
+## Envío al WS
+
+RADIAN usa el **mismo endpoint VPFE** con el SOAP action
+`SendEventUpdateStatus` (síncrono).
+
+```php
+use RoyaltyFusion\DianPhp\Ws\SoapClient;
+
+$signed = (new XadesSigner('/path/cert.p12', 'pwd'))->sign($xmlEvento);
+$result = (new SoapClient(SoapClient::ENV_HABILITACION))->sendEventUpdateStatus($signed, $cudeEvento);
+```
+
+También puedes consultar los eventos registrados sobre un CUFE:
+
+```php
+$eventos = (new SoapClient(SoapClient::ENV_PRODUCCION))->getStatusEvent($cufeFactura);
+```
+
 ## Pendiente
 
 * **CUDE específico para eventos** (algoritmo distinto al de NC/ND) —
   implementar `EventCudeGenerator`.
-* **Envío al WS RADIAN** (`SendEventUpdateStatus`) — añadir método en
-  `SoapClient`.

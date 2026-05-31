@@ -80,10 +80,26 @@ CUNE = SHA-384(
 Los totales se **truncan** a 2 decimales (no se redondean) según
 especificación DIAN. El SDK ya aplica el truncado.
 
+## Envío al WS
+
+Nómina usa el **mismo endpoint VPFE** que las facturas — el discriminador es
+el SOAP action `SendNominaSync` (síncrono, recibes la validación en el call).
+
+```php
+use RoyaltyFusion\DianPhp\Ws\SoapClient;
+use RoyaltyFusion\DianPhp\Signer\XadesSigner;
+
+$signed = (new XadesSigner('/path/cert.p12', 'pwd'))->sign($xml);
+$result = (new SoapClient(SoapClient::ENV_HABILITACION))->sendNominaSync($signed, $cune);
+
+echo $result->isSuccess() ? 'OK' : $result->getErrorMessage();
+```
+
+Ver [docs/connections-reference.md](./connections-reference.md) para la
+tabla completa de las 13 operaciones SOAP soportadas.
+
 ## Pendiente
 
 * **Nómina de Ajuste** (`TipoXML=103`) — reemplazo o eliminación de una nómina
   previa por CUNE.
-* **Envío al WS**: `apifedi.dian.gov.co/Nomina` no está cableado en
-  `SoapClient` todavía — se enviará en una próxima sesión cuando lleguen XML
-  de nómina reales para validar bit-a-bit.
+* **Golden master** contra un XML real de Nómina aprobado.

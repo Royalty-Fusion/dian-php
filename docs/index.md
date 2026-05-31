@@ -20,6 +20,7 @@ desacoplada de [Greenter](https://github.com/giansalex/greenter).
 | [Representación gráfica](./report.md) | `HtmlReport` + integración con dompdf/mpdf. |
 | [Bundle Symfony](./symfony.md) | DI, configuración YAML, comando `dian:status`. |
 | [REST API blueprint](./rest-api-blueprint.md) | Diseño recomendado de endpoints REST para tu ERP. |
+| [Conexiones DIAN](./connections-reference.md) | URLs, SOAP actions, namespaces, constantes — referencia completa. |
 | [Arquitectura](./architecture.md) | Cómo está organizado el SDK (estilo Greenter). |
 | [Troubleshooting](./troubleshooting.md) | Errores DIAN comunes y cómo resolverlos. |
 
