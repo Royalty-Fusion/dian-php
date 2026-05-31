@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+{% set dev = doc.devengados %}
+{% set ded = doc.deducciones %}
+{% set emp = doc.empleador %}
+{% set tra = doc.trabajador %}
+{% set per = doc.periodo %}
+{% set pag = doc.pago %}
+<fe:NominaIndividual xmlns:fe="dian:gov:co:facturaelectronica:NominaIndividual"
+                     xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+                     xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2"
+                     SchemaLocation="dian:gov:co:facturaelectronica:NominaIndividual NominaIndividualElectronicaXSD.xsd">
+    <ext:UBLExtensions>
+        <ext:UBLExtension>
+            <ext:ExtensionContent/>
+        </ext:UBLExtension>
+    </ext:UBLExtensions>
+
+    {% if per %}
+    <Periodo
+        FechaIngreso="{{ per.fechaIngreso|date('Y-m-d') }}"
+        {% if per.fechaRetiro %}FechaRetiro="{{ per.fechaRetiro|date('Y-m-d') }}"{% endif %}
+        FechaLiquidacionInicio="{{ per.fechaLiquidacionInicio|date('Y-m-d') }}"
+        FechaLiquidacionFin="{{ per.fechaLiquidacionFin|date('Y-m-d') }}"
+        TiempoLaborado="{{ per.tiempoLaborado }}"
+        FechaGen="{{ doc.fechaGen|date('Y-m-d') }}"/>
+    {% endif %}
+
+    <NumeroSecuenciaXML
+        CodigoTrabajador="{{ doc.codigoTrabajador ?: (tra ? tra.codigoTrabajador : '') }}"
+        Consecutivo="{{ doc.consecutivo }}"
+        Numero="{{ doc.prefijo }}{{ doc.numero }}"
+        Prefijo="{{ doc.prefijo }}"/>
+
+    <LugarGeneracionXML
+        Municipio="{{ doc.lugarMunicipioCiudad }}"
+        Pais="{{ doc.lugarPais }}"
+        DepartamentoEstado="{{ doc.lugarDepartamentoEstado }}"
+        Idioma="{{ doc.lugarIdioma }}"/>
+
+    {% if doc.software %}
+    <ProveedorXML
+        NIT="{{ doc.software.providerNit }}"
+        DV="0"
+        SoftwareID="{{ doc.software.id }}"
+        SoftwareSC="{{ doc.softwareSC }}"/>
+    {% endif %}
+
+    <CodigoQR>{{ qrCodeUrl }}</CodigoQR>
+
+    <InformacionGeneral
+        Version="V1.0"
+        Ambiente="{{ doc.ambiente }}"
+        TipoXML="{{ doc.tipoXML }}"
+        CUNE="{{ cune }}"
+        EncripCUNE="CUNE-SHA384"
+        PeriodoNomina="{{ doc.periodoNomina }}"
+        TipoMoneda="{{ doc.tipoMoneda }}"
+        {% if doc.trm > 0 %}TRM="{{ doc.trm|number_format(2, '.', '') }}"{% endif %}
+        FechaGen="{{ doc.fechaGen|date('Y-m-d') }}"
+        HoraGen="{{ doc.fechaGen|date('H:i:sP') }}"
+        FechaPago="{{ doc.fechaPago|date('Y-m-d') }}"
+        {% if doc.tipoNota %}TipoNota="{{ doc.tipoNota }}"{% endif %}
+        {% if doc.sucursal %}Sucursal="{{ doc.sucursal }}"{% endif %}/>
+
+    {% for nota in doc.notas %}
+    <Notas Text="{{ nota }}"/>
+    {% endfor %}
+
+    {% if emp %}
+    <Empleador
+        NIT="{{ emp.nit }}"
+        DV="{{ emp.dv }}"
+        NombreRazonSocial="{{ emp.nombreRazonSocial }}"
+        Pais="{{ emp.pais }}"
+        DepartamentoEstado="{{ emp.departamentoEstado }}"
+        MunicipioCiudad="{{ emp.municipioCiudad }}"
+        Direccion="{{ emp.direccion }}"/>
+    {% endif %}
+
+    {% if tra %}
+    <Trabajador
+        TipoTrabajador="{{ tra.tipoTrabajador }}"
+        SubTipoTrabajador="{{ tra.subTipoTrabajador }}"
+        AltoRiesgoPension="{{ tra.altoRiesgoPension ? 'true' : 'false' }}"
+        TipoDocumento="{{ tra.tipoDocumento }}"
+        NumeroDocumento="{{ tra.numeroDocumento }}"
+        PrimerApellido="{{ tra.primerApellido }}"
+        {% if tra.segundoApellido %}SegundoApellido="{{ tra.segundoApellido }}"{% endif %}
+        PrimerNombre="{{ tra.primerNombre }}"
+        {% if tra.otrosNombres %}OtrosNombres="{{ tra.otrosNombres }}"{% endif %}
+        LugarTrabajoPais="{{ tra.lugarTrabajoPais }}"
+        LugarTrabajoDepartamentoEstado="{{ tra.lugarTrabajoDepartamentoEstado }}"
+        LugarTrabajoMunicipioCiudad="{{ tra.lugarTrabajoMunicipioCiudad }}"
+        LugarTrabajoDireccion="{{ tra.lugarTrabajoDireccion }}"
+        SalarioIntegral="{{ tra.salarioIntegral ? 'true' : 'false' }}"
+        TipoContrato="{{ tra.tipoContrato }}"
+        Sueldo="{{ tra.sueldo|number_format(2, '.', '') }}"
+        {% if tra.codigoTrabajador %}CodigoTrabajador="{{ tra.codigoTrabajador }}"{% endif %}/>
+    {% endif %}
+
+    {% if pag %}
+    <Pago
+        Forma="{{ pag.forma }}"
+        Metodo="{{ pag.metodo }}"
+        {% if pag.banco %}Banco="{{ pag.banco }}"{% endif %}
+        {% if pag.tipoCuenta %}TipoCuenta="{{ pag.tipoCuenta }}"{% endif %}
+        {% if pag.numeroCuenta %}NumeroCuenta="{{ pag.numeroCuenta }}"{% endif %}/>
+    {% endif %}
+
+    <FechasPagos>
+        <FechaPago Fecha="{{ doc.fechaPago|date('Y-m-d') }}"/>
+    </FechasPagos>
+
+    <DevengadosTotal>{{ devTotal }}</DevengadosTotal>
+    <DeduccionesTotal>{{ dedTotal }}</DeduccionesTotal>
+    <ComprobanteTotal>{{ compTotal }}</ComprobanteTotal>
+
+    <Devengados>
+        <Basico DiasTrabajados="{{ dev.basicoDiasTrabajados }}" SueldoTrabajado="{{ dev.basicoSueldoTrabajado|number_format(2, '.', '') }}"/>
+        {% if dev.auxilioTransporte > 0 or dev.viaticoManuAlojS > 0 or dev.viaticoManuAlojNS > 0 %}
+        <Transporte
+            {% if dev.auxilioTransporte > 0 %}AuxilioTransporte="{{ dev.auxilioTransporte|number_format(2, '.', '') }}"{% endif %}
+            {% if dev.viaticoManuAlojS > 0 %}ViaticoManuAlojS="{{ dev.viaticoManuAlojS|number_format(2, '.', '') }}"{% endif %}
+            {% if dev.viaticoManuAlojNS > 0 %}ViaticoManuAlojNS="{{ dev.viaticoManuAlojNS|number_format(2, '.', '') }}"{% endif %}/>
+        {% endif %}
+        {% if dev.horasExtraDiurnas > 0 %}<HEDs Pago="{{ dev.horasExtraDiurnas|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.horasExtraNocturnas > 0 %}<HENs Pago="{{ dev.horasExtraNocturnas|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.horasRecargoDiurnoNocturno > 0 %}<HRDs Pago="{{ dev.horasRecargoDiurnoNocturno|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.vacacionesComunes > 0 or dev.vacacionesCompensadas > 0 %}
+        <Vacaciones>
+            {% if dev.vacacionesComunes > 0 %}<VacacionesComunes Pago="{{ dev.vacacionesComunes|number_format(2, '.', '') }}"/>{% endif %}
+            {% if dev.vacacionesCompensadas > 0 %}<VacacionesCompensadas Pago="{{ dev.vacacionesCompensadas|number_format(2, '.', '') }}"/>{% endif %}
+        </Vacaciones>
+        {% endif %}
+        {% if dev.primas > 0 or dev.primasNS > 0 %}
+        <Primas {% if dev.primas > 0 %}Pago="{{ dev.primas|number_format(2, '.', '') }}"{% endif %}
+                {% if dev.primasNS > 0 %}PagoNS="{{ dev.primasNS|number_format(2, '.', '') }}"{% endif %}/>
+        {% endif %}
+        {% if dev.cesantias > 0 or dev.interesesCesantias > 0 %}
+        <Cesantias
+            {% if dev.cesantias > 0 %}Pago="{{ dev.cesantias|number_format(2, '.', '') }}"{% endif %}
+            {% if dev.porcentajeInteresesCesantias > 0 %}Porcentaje="{{ dev.porcentajeInteresesCesantias|number_format(2, '.', '') }}"{% endif %}
+            {% if dev.interesesCesantias > 0 %}PagoIntereses="{{ dev.interesesCesantias|number_format(2, '.', '') }}"{% endif %}/>
+        {% endif %}
+        {% if dev.incapacidades > 0 %}<Incapacidades Pago="{{ dev.incapacidades|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.licencias > 0 %}<Licencias Pago="{{ dev.licencias|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.bonificaciones > 0 %}<Bonificaciones BonificacionS="{{ dev.bonificaciones|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.auxilios > 0 %}<Auxilios Auxilio="{{ dev.auxilios|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.huelgasLegales > 0 %}<HuelgasLegales Pago="{{ dev.huelgasLegales|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.otrosConceptos > 0 %}<OtrosConceptos ConceptoS="{{ dev.otrosConceptos|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.comisiones > 0 %}<Comisiones Comision="{{ dev.comisiones|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.pagosTerceros > 0 %}<PagosTerceros PagoTercero="{{ dev.pagosTerceros|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.anticipos > 0 %}<Anticipos Anticipo="{{ dev.anticipos|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.dotacion > 0 %}<Dotacion Dotacion="{{ dev.dotacion|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.apoyoSost > 0 %}<ApoyoSost Pago="{{ dev.apoyoSost|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.teletrabajo > 0 %}<Teletrabajo Bonificaciones="{{ dev.teletrabajo|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.bonificacionRetiro > 0 %}<BonificacionRetiro Pago="{{ dev.bonificacionRetiro|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.indemnizacion > 0 %}<Indemnizacion Pago="{{ dev.indemnizacion|number_format(2, '.', '') }}"/>{% endif %}
+        {% if dev.reintegro > 0 %}<Reintegro Pago="{{ dev.reintegro|number_format(2, '.', '') }}"/>{% endif %}
+    </Devengados>
+
+    <Deducciones>
+        <Salud Porcentaje="{{ ded.saludPorcentaje|number_format(2, '.', '') }}" Deduccion="{{ ded.saludDeduccion|number_format(2, '.', '') }}"/>
+        <FondoPension Porcentaje="{{ ded.pensionPorcentaje|number_format(2, '.', '') }}" Deduccion="{{ ded.pensionDeduccion|number_format(2, '.', '') }}"/>
+        {% if ded.fondoSPDeduccionSP > 0 or ded.fondoSPDeduccionSub > 0 %}
+        <FondoSP
+            {% if ded.fondoSPDeduccionSP > 0 %}DeduccionSP="{{ ded.fondoSPDeduccionSP|number_format(2, '.', '') }}"{% endif %}
+            {% if ded.fondoSPDeduccionSub > 0 %}DeduccionSub="{{ ded.fondoSPDeduccionSub|number_format(2, '.', '') }}"{% endif %}/>
+        {% endif %}
+        {% if ded.sindicatos > 0 %}<Sindicatos Deduccion="{{ ded.sindicatos|number_format(2, '.', '') }}"/>{% endif %}
+        {% if ded.sanciones > 0 %}<Sanciones SancionPublic="{{ ded.sanciones|number_format(2, '.', '') }}"/>{% endif %}
+        {% if ded.libranzas > 0 %}<Libranzas Deduccion="{{ ded.libranzas|number_format(2, '.', '') }}"/>{% endif %}
+        {% if ded.pagosTerceros > 0 %}<PagosTerceros Pago="{{ ded.pagosTerceros|number_format(2, '.', '') }}"/>{% endif %}
+        {% if ded.anticipos > 0 %}<Anticipos Anticipo="{{ ded.anticipos|number_format(2, '.', '') }}"/>{% endif %}
+        {% if ded.otrasDeducciones > 0 %}<OtrasDeducciones OtraDeduccion="{{ ded.otrasDeducciones|number_format(2, '.', '') }}"/>{% endif %}
+        {% if ded.pensionVoluntaria > 0 %}<PensionVoluntaria Deduccion="{{ ded.pensionVoluntaria|number_format(2, '.', '') }}"/>{% endif %}
+        {% if ded.retencionFuente > 0 %}<RetencionFuente Deduccion="{{ ded.retencionFuente|number_format(2, '.', '') }}"/>{% endif %}
+        {% if ded.afc > 0 %}<AFC Deduccion="{{ ded.afc|number_format(2, '.', '') }}"/>{% endif %}
+        {% if ded.cooperativa > 0 %}<Cooperativa Deduccion="{{ ded.cooperativa|number_format(2, '.', '') }}"/>{% endif %}
+        {% if ded.embargoFiscal > 0 %}<EmbargoFiscal Deduccion="{{ ded.embargoFiscal|number_format(2, '.', '') }}"/>{% endif %}
+        {% if ded.planComplementarios > 0 %}<PlanComplementarios Deduccion="{{ ded.planComplementarios|number_format(2, '.', '') }}"/>{% endif %}
+        {% if ded.educacion > 0 %}<Educacion Deduccion="{{ ded.educacion|number_format(2, '.', '') }}"/>{% endif %}
+        {% if ded.reintegro > 0 %}<Reintegro Deduccion="{{ ded.reintegro|number_format(2, '.', '') }}"/>{% endif %}
+        {% if ded.deuda > 0 %}<Deuda Deduccion="{{ ded.deuda|number_format(2, '.', '') }}"/>{% endif %}
+    </Deducciones>
+</fe:NominaIndividual>
