@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AttachedDocument xmlns="urn:oasis:names:specification:ubl:schema:xsd:AttachedDocument-2"
+                  xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+                  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
+                  xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2"
+                  xmlns:sts="dian:gov:co:facturaelectronica:Structures-2-1"
+                  xmlns:xades="http://uri.etsi.org/01903/v1.3.2#"
+                  xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+    <ext:UBLExtensions>
+        <ext:UBLExtension>
+            <ext:ExtensionContent/>
+        </ext:UBLExtension>
+    </ext:UBLExtensions>
+    <cbc:UBLVersionID>UBL 2.1</cbc:UBLVersionID>
+    <cbc:CustomizationID>{{ doc.customizationId }}</cbc:CustomizationID>
+    <cbc:ProfileID>{{ doc.profileId }}</cbc:ProfileID>
+    <cbc:ProfileExecutionID>{{ doc.profileExecutionId }}</cbc:ProfileExecutionID>
+    <cbc:ID>{{ doc.id }}</cbc:ID>
+    {% if doc.issueDate %}
+    <cbc:IssueDate>{{ doc.issueDate|date('Y-m-d') }}</cbc:IssueDate>
+    <cbc:IssueTime>{{ doc.issueDate|date('H:i:s') }}</cbc:IssueTime>
+    {% endif %}
+    <cbc:DocumentType>Contenedor de Factura Electrónica</cbc:DocumentType>
+    <cbc:ParentDocumentID>{{ doc.parentDocumentId }}</cbc:ParentDocumentID>
+
+    {% if doc.sender %}
+    <cac:SenderParty>
+        <cac:PartyTaxScheme>
+            <cbc:RegistrationName>{{ doc.sender.razonSocial }}</cbc:RegistrationName>
+            <cbc:CompanyID schemeAgencyID="195" schemeID="{{ doc.sender.nitDv }}" schemeName="{{ doc.sender.tipoDocumento }}">{{ doc.sender.nit }}</cbc:CompanyID>
+            <cbc:TaxLevelCode>{{ doc.sender.responsabilidades }}</cbc:TaxLevelCode>
+            <cac:TaxScheme>
+                <cbc:ID>01</cbc:ID>
+                <cbc:Name>IVA</cbc:Name>
+            </cac:TaxScheme>
+        </cac:PartyTaxScheme>
+    </cac:SenderParty>
+    {% endif %}
+
+    {% if doc.receiver %}
+    <cac:ReceiverParty>
+        <cac:PartyTaxScheme>
+            <cbc:RegistrationName>{{ doc.receiver.razonSocial }}</cbc:RegistrationName>
+            <cbc:CompanyID schemeAgencyID="195" schemeID="0" schemeName="{{ doc.receiver.tipoDocumento }}">{{ doc.receiver.numeroDocumento }}</cbc:CompanyID>
+            <cbc:TaxLevelCode>{{ doc.receiver.responsabilidades }}</cbc:TaxLevelCode>
+            <cac:TaxScheme>
+                <cbc:ID>01</cbc:ID>
+                <cbc:Name>IVA</cbc:Name>
+            </cac:TaxScheme>
+        </cac:PartyTaxScheme>
+    </cac:ReceiverParty>
+    {% endif %}
+
+    <cac:Attachment>
+        <cac:ExternalReference>
+            <cbc:MimeCode>text/xml</cbc:MimeCode>
+            <cbc:EncodingCode>UTF-8</cbc:EncodingCode>
+            <cbc:Description><![CDATA[{{ doc.signedInvoiceXml }}]]></cbc:Description>
+        </cac:ExternalReference>
+    </cac:Attachment>
+
+    {% if doc.applicationResponseXml %}
+    <cac:ParentDocumentLineReference>
+        <cbc:LineID>1</cbc:LineID>
+        <cac:DocumentReference>
+            <cbc:ID>{{ doc.parentDocumentId }}</cbc:ID>
+            <cbc:UUID schemeName="CUFE-SHA384">{{ doc.id }}</cbc:UUID>
+            {% if doc.issueDate %}<cbc:IssueDate>{{ doc.issueDate|date('Y-m-d') }}</cbc:IssueDate>{% endif %}
+            <cbc:DocumentType>ApplicationResponse</cbc:DocumentType>
+            <cac:Attachment>
+                <cac:ExternalReference>
+                    <cbc:MimeCode>text/xml</cbc:MimeCode>
+                    <cbc:EncodingCode>UTF-8</cbc:EncodingCode>
+                    <cbc:Description><![CDATA[{{ doc.applicationResponseXml }}]]></cbc:Description>
+                </cac:ExternalReference>
+            </cac:Attachment>
+        </cac:DocumentReference>
+    </cac:ParentDocumentLineReference>
+    {% endif %}
+</AttachedDocument>
