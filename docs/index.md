@@ -12,9 +12,14 @@ desacoplada de [Greenter](https://github.com/giansalex/greenter).
 | [Quick start](./quick-start.md) | Tu primera factura firmada en menos de 5 minutos. |
 | [Factura electrónica](./invoice.md) | Modelo `Invoice` completo, descuentos, anticipos, retenciones. |
 | [Notas crédito / débito](./credit-debit-notes.md) | Cuándo usar `CreditNote` vs `DebitNote`, códigos de discrepancia. |
+| [Documento Soporte (DS)](./support-document.md) | Compras a no obligados a facturar — emisión de DS. |
+| [Nómina Electrónica](./payroll.md) | NIE con 28 devengados + 21 deducciones + CUNE. |
+| [RADIAN (eventos)](./radian.md) | Acuse, Recibo, Aceptación, Endoso, Pago — 13 eventos. |
+| [AttachedDocument](./attached-document.md) | Contenedor B2B — parser + builder. |
 | [Validación](./validation.md) | `BusinessRuleValidator`, `XsdValidator`, reglas oficiales. |
 | [Representación gráfica](./report.md) | `HtmlReport` + integración con dompdf/mpdf. |
 | [Bundle Symfony](./symfony.md) | DI, configuración YAML, comando `dian:status`. |
+| [REST API blueprint](./rest-api-blueprint.md) | Diseño recomendado de endpoints REST para tu ERP. |
 | [Arquitectura](./architecture.md) | Cómo está organizado el SDK (estilo Greenter). |
 | [Troubleshooting](./troubleshooting.md) | Errores DIAN comunes y cómo resolverlos. |
 
@@ -25,9 +30,10 @@ desacoplada de [Greenter](https://github.com/giansalex/greenter).
 | Factura Electrónica de Venta | ✅ Completo |
 | Nota Crédito (con / sin referencia) | ✅ Completo |
 | Nota Débito (con / sin referencia) | ✅ Completo |
-| Documento Soporte (DS) | 🚧 Scaffold + TODO |
-| Nómina Electrónica (NIE) | 🚧 Scaffold + TODO |
-| RADIAN (eventos de título valor) | 🚧 Scaffold + TODO |
+| Documento Soporte (DS) | ✅ Completo |
+| Nómina Electrónica (NIE) | ✅ Completo |
+| RADIAN (eventos de título valor) | ✅ Completo |
+| AttachedDocument (B2B) | ✅ Builder + Parser |
 
 Ver el [roadmap](./roadmap.md) para detalle.
 

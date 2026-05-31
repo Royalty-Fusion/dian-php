@@ -8,15 +8,19 @@
 | 3 | Modelos enriquecidos (Address, Charge, Prepayment, ...) | ✅ |
 | 4 | Template `invoice.xml.twig` 100% Anexo V1.9 | ✅ |
 | 5 | Templates `creditnote.xml.twig` y `debitnote.xml.twig` | ✅ |
-| 6 | Documento Soporte (DS) + Nota Ajuste DS | 🚧 scaffold |
-| 7 | Nómina Electrónica (NIE) | 🚧 scaffold |
-| 8 | RADIAN (eventos de título valor) | 🚧 scaffold |
+| 6 | Documento Soporte (DS) + Nota Ajuste DS | ✅ DS completo (NotaAjuste pendiente) |
+| 7 | Nómina Electrónica (NIE) | ✅ Completo |
+| 8 | RADIAN (eventos de título valor) | ✅ Completo |
 | 9 | Validators (BusinessRule + XSD) | ✅ |
 | 10 | Representación gráfica HTML (PDF-ready) | ✅ |
 | 11 | WS extra (GetStatus, GetStatusZip) | ✅ |
 | 12 | Bundle Symfony + comandos | ✅ |
-| 13 | Tests con fixtures DIAN reales | 🚧 base lista |
+| 13 | Tests con fixtures DIAN reales | ✅ Siigo golden master + 71 tests |
 | 14 | Documentación pública | ✅ esta serie |
+| 15 | Compliance fixes del XML real Siigo | ✅ Completo |
+| 16 | DS + RADIAN + Nómina + extras (lopezsoft) | ✅ Completo |
+| 17 | Catálogos DANE/DIAN completos + REST blueprint | ✅ Completo |
+| 18 | Pulido: ejemplos + docs + CHANGELOG | ✅ Completo |
 
 ## Próximos hitos
 
