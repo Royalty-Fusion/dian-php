@@ -7,7 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Pending
+### Pending after 0.1.1
+
+## [0.1.1] - 2026-05-31
+
+### Added
+
+- 5 new real-world golden master fixtures from Siigo Nube production traffic
+  (Factura nacional, Factura exportación USD/COP, Factura con retenciones
+  ReteRenta+ReteICA, NC nacional, NC exportación, NC nacional sobre factura
+  con retenciones). All come from BLINDACCES SAS (NIT 901944237-8) and are
+  DIAN-approved (`<cbc:ResponseCode>02</cbc:ResponseCode>`).
+
+- `SiigoGoldenMastersTest` — 10 assertions per fixture covering CUFE/CUDE
+  format, ParentDocumentID, CustomizationID, schemeID, currency, PayableAmount,
+  DIAN approval status, BillingReference, DiscrepancyResponse and supplier
+  identity. The SDK's `AttachedDocumentParser` now has a regression net
+  against 6 distinct production patterns.
+
+### Validated by these new fixtures
+
+- ✅ `schemeID="1"` default matches every real Siigo invoice.
+- ✅ `PaymentExchangeRate` block structure matches exports to Guatemala USD/COP.
+- ✅ `WithholdingTaxTotal` structure matches dual-retention scenario
+  (ReteRenta code 06 + ReteICA code 07).
+- ✅ Note `CustomizationID=20` with `BillingReference` matches all 3 NCs.
+- ✅ `<cbc:ResponseCode>02</cbc:ResponseCode>` detection via `isAccepted()`
+  works on real DIAN-approved documents.
+
+### Still not validated against production
+
+- ❌ Documento Soporte (DS) — no real DS XML available yet
+- ❌ Nota Débito (ND) — no real ND XML available yet
+- ❌ Nómina Electrónica (NIE) — no real Nómina XML available yet
+- ❌ RADIAN events — no real event XML available yet
+
+Tests: **89 / 429 assertions** green (was 79/321 in v0.1.0).
+
+### Pending after 0.1.0
 - WS-Security `BinarySecurityToken` for production `SendBillSync` (header-level
   signature). Habilitación works without WSSE; Producción may require it.
 - Golden master tests against real Nómina / DS / RADIAN XMLs (waiting for fixtures).
