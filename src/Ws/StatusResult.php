@@ -9,6 +9,33 @@ namespace RoyaltyFusion\DianPhp\Ws;
  */
 final class StatusResult
 {
+    private ?DianResponse $response = null;
+
+    public static function fromResponse(DianResponse $response): self
+    {
+        $result = (new self())
+            ->setIsValid($response->isValid())
+            ->setStatusCode($response->getStatusCode())
+            ->setStatusDescription($response->getFault() ?? $response->getStatusDescription())
+            ->setStatusMessage($response->getStatusMessage())
+            ->setApplicationResponseXml($response->getApplicationResponseXml())
+            ->setErrorMessages($response->getErrors());
+        $result->response = $response;
+
+        return $result;
+    }
+
+    /** Still being processed by DIAN (async flow): ask again in a few seconds. */
+    public function isProcessing(): bool
+    {
+        return $this->response?->isProcessing() ?? false;
+    }
+
+    public function getResponse(): ?DianResponse
+    {
+        return $this->response;
+    }
+
     private bool $isValid = false;
     private string $statusCode = '';
     private string $statusDescription = '';

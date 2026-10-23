@@ -37,7 +37,7 @@ final class TwigFactory
         if (class_exists(EscaperRuntime::class)) {
             $twig->getRuntime(EscaperRuntime::class)->setEscaper('xml', $escaper);
         } else {
-            /** @phpstan-ignore-next-line Twig < 3.10 */
+            // Twig < 3.10
             $twig->getExtension(EscaperExtension::class)->setEscaper(
                 'xml',
                 static fn (Environment $env, mixed $string): string => self::escape((string) $string)

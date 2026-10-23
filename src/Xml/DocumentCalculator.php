@@ -110,18 +110,19 @@ final class DocumentCalculator
         $taxableFromDoc       = 0.0;
 
         foreach ($docRows as [$row, $isRetention]) {
+            $code = $row['code'];
             if ($isRetention) {
-                $bucket = &$withholdingTaxGroups;
-            } else {
-                $bucket = &$taxGroups;
-                $totalTaxes += $row['amount'];
-                $taxableFromDoc += $row['base'];
-                $taxTotalsByCode[$row['code']] = self::round(($taxTotalsByCode[$row['code']] ?? 0.0) + $row['amount']);
+                $withholdingTaxGroups[$code] ??= ['amount' => 0.0, 'subtotals' => []];
+                $withholdingTaxGroups[$code]['amount']      = self::round($withholdingTaxGroups[$code]['amount'] + $row['amount']);
+                $withholdingTaxGroups[$code]['subtotals'][] = $row;
+                continue;
             }
-            $bucket[$row['code']] ??= ['amount' => 0.0, 'subtotals' => []];
-            $bucket[$row['code']]['amount']      = self::round($bucket[$row['code']]['amount'] + $row['amount']);
-            $bucket[$row['code']]['subtotals'][] = $row;
-            unset($bucket);
+            $totalTaxes     += $row['amount'];
+            $taxableFromDoc += $row['base'];
+            $taxTotalsByCode[$code] = self::round(($taxTotalsByCode[$code] ?? 0.0) + $row['amount']);
+            $taxGroups[$code] ??= ['amount' => 0.0, 'subtotals' => []];
+            $taxGroups[$code]['amount']      = self::round($taxGroups[$code]['amount'] + $row['amount']);
+            $taxGroups[$code]['subtotals'][] = $row;
         }
 
         $allowanceTotalAmount = 0.0;

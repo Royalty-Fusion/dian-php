@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoyaltyFusion\DianPhp\Tests\Unit\Catalog;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RoyaltyFusion\DianPhp\Catalog\Departamento;
 use RoyaltyFusion\DianPhp\Catalog\DianCatalogInterface;
@@ -53,17 +54,20 @@ final class EnumsTest extends TestCase
 
     /**
      * @param  class-string<DianCatalogInterface>  $enumClass
-     * @dataProvider catalogProvider
      */
+    #[DataProvider('catalogProvider')]
     public function testCatalogResolution(string $enumClass, string $code, string $expectedDescription): void
     {
-        /** @var \BackedEnum&DianCatalogInterface $instance */
-        $instance = $enumClass::tryFromCode($code);
+        /** @var callable(string): ?DianCatalogInterface $tryFromCode */
+        $tryFromCode = [$enumClass, 'tryFromCode'];
+        /** @var callable(string): bool $hasCode */
+        $hasCode  = [$enumClass, 'hasCode'];
+        $instance = $tryFromCode($code);
         $this->assertNotNull($instance, "Code $code should be resolvable on $enumClass");
         $this->assertSame($code, $instance->code());
         $this->assertSame($expectedDescription, $instance->description());
-        $this->assertTrue($enumClass::hasCode($code));
-        $this->assertFalse($enumClass::hasCode('__NONEXISTENT__'));
+        $this->assertTrue($hasCode($code));
+        $this->assertFalse($hasCode('__NONEXISTENT__'));
     }
 
     public function testTributoFlagsRetentions(): void

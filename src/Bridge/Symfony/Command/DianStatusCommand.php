@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace RoyaltyFusion\DianPhp\Bridge\Symfony\Command;
 
-use RoyaltyFusion\DianPhp\Ws\SoapClient;
+use RoyaltyFusion\DianPhp\Dian;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -16,7 +16,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 #[AsCommand(name: 'dian:status', description: 'Consultar estado de un documento por su CUFE/CUDE.')]
 final class DianStatusCommand extends Command
 {
-    public function __construct(private readonly SoapClient $soapClient)
+    public function __construct(private readonly Dian $dian)
     {
         parent::__construct();
     }
@@ -24,7 +24,7 @@ final class DianStatusCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addArgument('trackId', InputArgument::REQUIRED, 'CUFE / CUDE del documento a consultar.')
+            ->addArgument('trackId', InputArgument::REQUIRED, 'CUFE / CUDE del documento, o ZipKey de un envío asíncrono.')
             ->addOption('zip', null, InputOption::VALUE_NONE, 'Descargar también el ApplicationResponse zipeado.');
     }
 
@@ -35,9 +35,10 @@ final class DianStatusCommand extends Command
 
         $io->title("Consulta DIAN para trackId={$trackId}");
 
+        $client = $this->dian->getSoapClient(); // signed with the configured certificate (WS-Security)
         $status = $input->getOption('zip')
-            ? $this->soapClient->getStatusZip($trackId)
-            : $this->soapClient->getStatus($trackId);
+            ? $client->getStatusZip($trackId)
+            : $client->getStatus($trackId);
 
         $io->definitionList(
             ['Válido'     => $status->isValid() ? 'Sí' : 'No'],

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoyaltyFusion\DianPhp\Tests\Unit\Model;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RoyaltyFusion\DianPhp\Model\NitDvCalculator;
 
@@ -26,7 +27,7 @@ final class NitDvCalculatorTest extends TestCase
         ];
     }
 
-    /** @dataProvider provider */
+    #[DataProvider('provider')]
     public function testComputeMatchesDianGoldenValues(string $nit, int $expected): void
     {
         $this->assertSame($expected, NitDvCalculator::compute($nit));

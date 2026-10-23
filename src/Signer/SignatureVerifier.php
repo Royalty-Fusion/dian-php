@@ -80,7 +80,8 @@ final class SignatureVerifier
                 $canonical = $copy->C14N(false, false);
             } else {
                 $id     = ltrim($uri, '#');
-                $target = $xpath->query("//*[@Id='{$id}']")?->item(0);
+                $found  = $xpath->query("//*[@Id='{$id}']");
+                $target = $found !== false ? $found->item(0) : null;
                 if (!$target instanceof \DOMElement) {
                     $errors[] = "No se encontró el elemento referenciado {$uri}.";
                     continue;
@@ -104,7 +105,8 @@ final class SignatureVerifier
         }
         $pem = "-----BEGIN CERTIFICATE-----\n" . chunk_split($certB64, 64, "\n") . "-----END CERTIFICATE-----\n";
 
-        $signedInfo = $xpath->query('ds:SignedInfo', $signature)?->item(0);
+        $found      = $xpath->query('ds:SignedInfo', $signature);
+        $signedInfo = $found !== false ? $found->item(0) : null;
         $sigValue   = base64_decode(preg_replace('/\s+/', '', (string) $xpath->evaluate('string(ds:SignatureValue)', $signature)) ?? '', true);
         $method     = (string) $xpath->evaluate('string(ds:SignedInfo/ds:SignatureMethod/@Algorithm)', $signature);
         $opensslAlg = match ($method) {

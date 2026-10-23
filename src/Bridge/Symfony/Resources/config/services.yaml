@@ -4,22 +4,12 @@ services:
     autoconfigure: false
     public: false
 
-  RoyaltyFusion\DianPhp\Signer\XadesSigner:
-    arguments:
-      - '%dian.cert.path%'
-      - '%dian.cert.password%'
-
   RoyaltyFusion\DianPhp\Ws\SoapClient:
     arguments:
       - '%dian.environment%'
-
-  RoyaltyFusion\DianPhp\Xml\CufeGenerator: ~
-  RoyaltyFusion\DianPhp\Xml\QrGenerator: ~
-
-  RoyaltyFusion\DianPhp\Xml\XmlBuilder:
-    arguments:
       - null
-      - '%dian.environment%'
+      - null
+      - '@?logger'
 
   RoyaltyFusion\DianPhp\Validator\BusinessRuleValidator: ~
 
@@ -29,6 +19,8 @@ services:
       - '%dian.report.logo_url%'
       - '%dian.report.accent_color%'
 
+  # Facade: builds CUFE/XML/signature with the right environment code and
+  # injects the certificate into the SOAP client (WS-Security).
   RoyaltyFusion\DianPhp\Dian:
     public: true
     arguments:
@@ -36,16 +28,24 @@ services:
       - '%dian.cert.password%'
       - '%dian.environment%'
     calls:
-      - [setSigner, ['@RoyaltyFusion\DianPhp\Signer\XadesSigner']]
       - [setSoapClient, ['@RoyaltyFusion\DianPhp\Ws\SoapClient']]
-      - [setXmlBuilder, ['@RoyaltyFusion\DianPhp\Xml\XmlBuilder']]
-      - [setCufeGenerator, ['@RoyaltyFusion\DianPhp\Xml\CufeGenerator']]
-      - [setQrGenerator, ['@RoyaltyFusion\DianPhp\Xml\QrGenerator']]
       - [setValidator, ['@RoyaltyFusion\DianPhp\Validator\BusinessRuleValidator']]
       - [validateBeforeSend, ['%dian.validate_before_send%']]
+      - [setProviderCode, ['%dian.software.provider_code%']]
+      - [setSignerRole, ['%dian.signer_role%']]
 
   # Console commands
   RoyaltyFusion\DianPhp\Bridge\Symfony\Command\DianStatusCommand:
     tags: ['console.command']
     arguments:
-      - '@RoyaltyFusion\DianPhp\Ws\SoapClient'
+      - '@RoyaltyFusion\DianPhp\Dian'
+
+  RoyaltyFusion\DianPhp\Bridge\Symfony\Command\DianDoctorCommand:
+    tags: ['console.command']
+    arguments:
+      - '%dian.cert.path%'
+      - '%dian.cert.password%'
+      - '%dian.environment%'
+      - '%dian.software.id%'
+      - '%dian.software.provider_nit%'
+      - '%dian.nit%'

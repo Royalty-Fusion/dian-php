@@ -4,48 +4,92 @@ declare(strict_types=1);
 
 namespace RoyaltyFusion\DianPhp;
 
+use Psr\Log\LoggerInterface;
 use RoyaltyFusion\DianPhp\Model\CreditNote;
 use RoyaltyFusion\DianPhp\Model\DebitNote;
 use RoyaltyFusion\DianPhp\Model\Invoice;
 use RoyaltyFusion\DianPhp\Model\Result;
+use RoyaltyFusion\DianPhp\Payroll\CuneGenerator;
+use RoyaltyFusion\DianPhp\Payroll\PayrollDocument;
+use RoyaltyFusion\DianPhp\Payroll\PayrollXmlBuilder;
+use RoyaltyFusion\DianPhp\Radian\ApplicationResponseBuilder;
+use RoyaltyFusion\DianPhp\Radian\EventCudeGenerator;
+use RoyaltyFusion\DianPhp\Radian\EventDocument;
+use RoyaltyFusion\DianPhp\Signer\Certificate;
+use RoyaltyFusion\DianPhp\Signer\SignatureVerifier;
 use RoyaltyFusion\DianPhp\Signer\XadesSigner;
+use RoyaltyFusion\DianPhp\SupportDocument\CudsGenerator;
+use RoyaltyFusion\DianPhp\SupportDocument\SupportDocument;
+use RoyaltyFusion\DianPhp\SupportDocument\SupportDocumentAdjustmentNote;
+use RoyaltyFusion\DianPhp\SupportDocument\SupportDocumentBuilder;
 use RoyaltyFusion\DianPhp\Validator\BusinessRuleValidator;
+use RoyaltyFusion\DianPhp\Validator\CertificateChecker;
+use RoyaltyFusion\DianPhp\Validator\PreflightReport;
+use RoyaltyFusion\DianPhp\Validator\ValidationResult;
+use RoyaltyFusion\DianPhp\Validator\XmlConsistencyChecker;
+use RoyaltyFusion\DianPhp\Validator\XsdValidator;
+use RoyaltyFusion\DianPhp\Ws\FileNameGenerator;
 use RoyaltyFusion\DianPhp\Ws\SoapClient;
+use RoyaltyFusion\DianPhp\Ws\StatusResult;
 use RoyaltyFusion\DianPhp\Xml\CufeGenerator;
 use RoyaltyFusion\DianPhp\Xml\QrGenerator;
 use RoyaltyFusion\DianPhp\Xml\XmlBuilder;
 
 /**
- * High-level facade — the "Greenter::see" of this SDK.
+ * Facade of the SDK: one object per facturador (certificate + environment).
  *
- * Orchestrates: CUFE/CUDE generation → QR URL → XML render → XAdES sign → SOAP send.
+ *   $dian   = new Dian('/ruta/cert.p12', 'clave', SoapClient::ENV_HABILITACION);
+ *   $report = $dian->preflight($invoice);   // dry run, nothing is sent
+ *   $result = $dian->send($invoice);        // validate → CUFE → XML → firma → DIAN
  *
- * The orchestration deliberately keeps the surface small so consumers
- * (e.g. the Symfony bundle in Phase 12) can swap pieces independently.
+ * Every send runs the pre-flight checks first (business rules, XSD, signature
+ * and the same recomputations DIAN does); disable with validateBeforeSend(false).
  */
 class Dian
 {
-    private string $certPath;
-    private string $certPassword;
+    private ?string $certPath;
+    private ?string $certPassword;
     private string $environment;
+    private ?Certificate $certificate = null;
 
-    private ?XmlBuilder             $xmlBuilder    = null;
-    private ?CufeGenerator          $cufeGenerator = null;
-    private ?QrGenerator            $qrGenerator   = null;
-    private ?XadesSigner            $signer        = null;
-    private ?SoapClient             $soapClient    = null;
-    private ?BusinessRuleValidator  $validator     = null;
-    private bool                    $validateBeforeSend = false;
+    private ?XmlBuilder $xmlBuilder = null;
+    private ?CufeGenerator $cufeGenerator = null;
+    private ?QrGenerator $qrGenerator = null;
+    private ?XadesSigner $signer = null;
+    private ?SoapClient $soapClient = null;
+    private ?BusinessRuleValidator $validator = null;
+    private ?LoggerInterface $logger = null;
+    private bool $validateBeforeSend = true;
+    private string $providerCode = '000';
+    private ?string $signerRole = XadesSigner::ROLE_SUPPLIER;
 
+    /**
+     * @param string $environment SoapClient::ENV_HABILITACION | SoapClient::ENV_PRODUCCION
+     */
     public function __construct(
-        string $certPath,
-        string $certPassword,
+        ?string $certPath,
+        ?string $certPassword,
         string $environment = SoapClient::ENV_HABILITACION
     ) {
+        if (!in_array($environment, [SoapClient::ENV_HABILITACION, SoapClient::ENV_PRODUCCION], true)) {
+            throw new \InvalidArgumentException("Ambiente inválido '{$environment}': use 'habilitacion' o 'produccion'.");
+        }
         $this->certPath     = $certPath;
         $this->certPassword = $certPassword;
         $this->environment  = $environment;
     }
+
+    public static function withCertificate(Certificate $certificate, string $environment = SoapClient::ENV_HABILITACION): self
+    {
+        $dian = new self(null, null, $environment);
+        $dian->certificate = $certificate;
+
+        return $dian;
+    }
+
+    // ------------------------------------------------------------------
+    // Configuration
+    // ------------------------------------------------------------------
 
     public function setXmlBuilder(XmlBuilder $xmlBuilder): self
     {
@@ -83,82 +127,336 @@ class Dian
         return $this;
     }
 
+    public function setLogger(LoggerInterface $logger): self
+    {
+        $this->logger = $logger;
+        return $this;
+    }
+
+    /** Runs the pre-flight checks before every send (default true). */
     public function validateBeforeSend(bool $enabled = true): self
     {
         $this->validateBeforeSend = $enabled;
         return $this;
     }
 
+    /** Código del proveedor tecnológico (PPP) for the file names; "000" for software propio. */
+    public function setProviderCode(string $providerCode): self
+    {
+        $this->providerCode = $providerCode;
+        return $this;
+    }
+
+    /** XadesSigner::ROLE_SUPPLIER (default) or ROLE_THIRD_PARTY for proveedores tecnológicos. */
+    public function setSignerRole(?string $signerRole): self
+    {
+        $this->signerRole = $signerRole;
+        $this->signer     = null;
+        return $this;
+    }
+
+    public function getEnvironment(): string
+    {
+        return $this->environment;
+    }
+
+    /** '1' producción / '2' habilitación (TipoAmbiente). */
+    public function getEnvironmentCode(): string
+    {
+        return $this->isProduction() ? CufeGenerator::ENV_PRODUCCION : CufeGenerator::ENV_HABILITACION;
+    }
+
+    public function isProduction(): bool
+    {
+        return $this->environment === SoapClient::ENV_PRODUCCION;
+    }
+
+    public function getCertificate(): Certificate
+    {
+        if ($this->certificate === null) {
+            if ($this->certPath === null) {
+                throw new \RuntimeException('No se configuró el certificado digital.');
+            }
+            $this->certificate = Certificate::fromPkcs12File($this->certPath, (string) $this->certPassword);
+        }
+
+        return $this->certificate;
+    }
+
+    public function getSoapClient(): SoapClient
+    {
+        if ($this->soapClient === null) {
+            $this->soapClient = new SoapClient($this->environment, null, null, $this->logger);
+        }
+        $this->soapClient->setCertificate($this->getCertificate());
+        if ($this->logger !== null) {
+            $this->soapClient->setLogger($this->logger);
+        }
+
+        return $this->soapClient;
+    }
+
+    // ------------------------------------------------------------------
+    // Factura, Nota Crédito, Nota Débito
+    // ------------------------------------------------------------------
+
     /**
-     * Sign + send an Invoice, CreditNote or DebitNote to DIAN.
+     * Validates, signs and sends a factura / nota.
+     *
+     * Habilitación with setTestSetId(): SendTestSetAsync → pending Result with
+     * ZipKey (use waitForResult()). Otherwise SendBillSync → final Result.
      */
     public function send(Invoice|CreditNote|DebitNote $document): Result
     {
         try {
             if ($this->validateBeforeSend) {
-                $validator = $this->validator ?? new BusinessRuleValidator();
-                $validation = $validator->validate($document);
-                if (!$validation->isValid()) {
-                    $result = new Result();
-                    $result->setSuccess(false);
-                    $result->setErrorMessage(implode(' | ', $validation->messages()));
-                    return $result;
+                $report = $this->preflight($document);
+                if (!$report->isReady()) {
+                    return $this->blocked($report, $report->getUuid());
                 }
+                $signedXml = $report->getSignedXml();
+                $uuid      = $report->getUuid();
+            } else {
+                [$uuid, $signedXml] = $this->buildSigned($document);
             }
 
-            $cufeGen = $this->cufeGenerator ?? new CufeGenerator();
-            $envFlag = $this->environment === SoapClient::ENV_PRODUCCION
-                ? CufeGenerator::ENV_PRODUCCION
-                : CufeGenerator::ENV_HABILITACION;
+            $type     = match (true) {
+                $document instanceof Invoice    => FileNameGenerator::FACTURA,
+                $document instanceof CreditNote => FileNameGenerator::NOTA_CREDITO,
+                default                         => FileNameGenerator::NOTA_DEBITO,
+            };
+            $fileName = FileNameGenerator::base($type, $document->getCompany()?->getNit() ?? '', $document->getNumero(), $document->getFecha(), $this->providerCode);
+            $testSet  = $this->isProduction() ? '' : $document->getTestSetId();
 
-            $keyOrPin = ($document instanceof Invoice)
-                ? $document->getTechnicalKey()
-                : ($document->getSoftware() ? $document->getSoftware()->getPin() : '');
-
-            $uuid = $cufeGen->generate($document, $keyOrPin, $envFlag);
-
-            $qrGen     = $this->qrGenerator ?? new QrGenerator();
-            $qrCodeUrl = $qrGen->generate($document, $uuid, $this->environment === SoapClient::ENV_PRODUCCION);
-
-            $builder = $this->xmlBuilder ?? new XmlBuilder(null, $envFlag);
-            $xml     = $builder->build($document, $uuid, $qrCodeUrl);
-
-            $signer    = $this->signer ?? new XadesSigner($this->certPath, $this->certPassword);
-            $signedXml = $signer->sign($xml);
-
-            $soap = $this->soapClient ?? new SoapClient($this->environment);
-
-            $nit      = $document->getCompany() ? $document->getCompany()->getNit() : '000000000';
-            $fileName = "z{$nit}{$document->getPrefijo()}{$document->getNumero()}";
-
-            return $soap->send($fileName, $signedXml, $document->getTestSetId(), $uuid);
+            return $this->getSoapClient()->send($fileName, $signedXml, $testSet, $uuid);
         } catch (\Throwable $th) {
-            $result = new Result();
-            $result->setSuccess(false);
-            $result->setErrorMessage($th->getMessage());
-            return $result;
+            return Result::failure($th->getMessage());
         }
     }
 
-    /**
-     * Returns the signed XML without sending it. Useful for previews/tests.
-     */
+    /** Signed XML of a factura / nota without sending it. */
     public function getSignedXml(Invoice|CreditNote|DebitNote $document): string
     {
-        $cufeGen = $this->cufeGenerator ?? new CufeGenerator();
-        $envFlag = $this->environment === SoapClient::ENV_PRODUCCION
-            ? CufeGenerator::ENV_PRODUCCION
-            : CufeGenerator::ENV_HABILITACION;
+        return $this->buildSigned($document)[1];
+    }
 
-        $keyOrPin = ($document instanceof Invoice)
+    /** CUFE / CUDE of a document (clave técnica for facturas, PIN for notas). */
+    public function getUuid(Invoice|CreditNote|DebitNote $document): string
+    {
+        return $this->cufe()->generate($document, $this->keyOrPin($document), $this->getEnvironmentCode());
+    }
+
+    /**
+     * Dry run: business rules, certificate, CUFE, XML, signature, XSD and
+     * the recomputations DIAN performs on reception. Nothing is sent.
+     */
+    public function preflight(Invoice|CreditNote|DebitNote|SupportDocument $document): PreflightReport
+    {
+        $report = new PreflightReport();
+        $report->add('reglas', ($this->validator ?? new BusinessRuleValidator())->validate($document, $this->getEnvironmentCode()));
+
+        try {
+            $certificate = $this->getCertificate();
+            $nit         = $document->getCompany()?->getNit();
+            $report->add('certificado', (new CertificateChecker())->check($certificate, $nit));
+        } catch (\Throwable $e) {
+            $report->add('certificado', (new ValidationResult())->add('CERT_000', $e->getMessage()));
+            return $report;
+        }
+
+        try {
+            if ($document instanceof SupportDocument) {
+                [$uuid, $signedXml] = $this->buildSignedSupportDocument($document);
+                $keyOrPin = $document->getSoftware()?->getPin() ?? '';
+            } else {
+                [$uuid, $signedXml] = $this->buildSigned($document);
+                $keyOrPin = $this->keyOrPin($document);
+            }
+        } catch (\Throwable $e) {
+            $report->add('xml', (new ValidationResult())->add('XML_000', 'No fue posible generar o firmar el XML: ' . $e->getMessage()));
+            return $report;
+        }
+        $report->setSignedXml($signedXml)->setUuid($uuid);
+
+        $report->add('xsd', (new XsdValidator())->validate($signedXml));
+
+        $signature = new ValidationResult();
+        foreach ((new SignatureVerifier())->verify($signedXml) as $problem) {
+            $signature->add('SIG_001', $problem);
+        }
+        $report->add('firma', $signature);
+
+        $report->add('consistencia', (new XmlConsistencyChecker())->check(
+            $signedXml,
+            $keyOrPin,
+            $document->getSoftware()?->getPin(),
+            $this->getEnvironmentCode()
+        ));
+
+        return $report;
+    }
+
+    // ------------------------------------------------------------------
+    // Documento Soporte y nota de ajuste
+    // ------------------------------------------------------------------
+
+    public function sendSupportDocument(SupportDocument $document): Result
+    {
+        try {
+            if ($this->validateBeforeSend) {
+                $report = $this->preflight($document);
+                if (!$report->isReady()) {
+                    return $this->blocked($report, $report->getUuid());
+                }
+                [$cuds, $signedXml] = [$report->getUuid(), $report->getSignedXml()];
+            } else {
+                [$cuds, $signedXml] = $this->buildSignedSupportDocument($document);
+            }
+
+            $type     = $document instanceof SupportDocumentAdjustmentNote ? FileNameGenerator::NOTA_AJUSTE_DS : FileNameGenerator::SOPORTE;
+            $fileName = FileNameGenerator::base($type, $document->getCompany()?->getNit() ?? '', $document->getNumero(), $document->getFecha(), $this->providerCode);
+
+            return $this->getSoapClient()->send($fileName, $signedXml, $this->isProduction() ? '' : $document->getTestSetId(), $cuds);
+        } catch (\Throwable $th) {
+            return Result::failure($th->getMessage());
+        }
+    }
+
+    public function getSignedSupportDocument(SupportDocument $document): string
+    {
+        return $this->buildSignedSupportDocument($document)[1];
+    }
+
+    // ------------------------------------------------------------------
+    // Nómina electrónica
+    // ------------------------------------------------------------------
+
+    /**
+     * Signs and sends a Nómina Individual. In habilitación pass the TestSetId
+     * of the nómina set de pruebas to use SendTestSetAsync.
+     */
+    public function sendPayroll(PayrollDocument $document, string $testSetId = ''): Result
+    {
+        try {
+            $document->setAmbiente($this->getEnvironmentCode());
+            $pin  = $document->getSoftware()?->getPin() ?? '';
+            $cune = (new CuneGenerator())->generate($document, $pin);
+            $xml  = (new PayrollXmlBuilder())->build($document, $cune, QrGenerator::url($cune, $this->isProduction()));
+            $signed = $this->signer()->sign($xml);
+
+            $fileName = FileNameGenerator::base(FileNameGenerator::NOMINA, $document->getEmpleador()?->getNit() ?? '', $document->getConsecutivo(), $document->getFechaGen(), $this->providerCode);
+            if (!$this->isProduction() && $testSetId !== '') {
+                return $this->getSoapClient()->sendTestSetAsync($fileName, $signed, $testSetId, $cune);
+            }
+
+            return $this->getSoapClient()->sendNominaSync($signed, $cune, $fileName);
+        } catch (\Throwable $th) {
+            return Result::failure($th->getMessage());
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // RADIAN
+    // ------------------------------------------------------------------
+
+    /** Signs and sends a RADIAN event (acuse, recibo, aceptación, reclamo…). */
+    public function sendEvent(EventDocument $event): Result
+    {
+        try {
+            if ($event->getCude() === '') {
+                $event->setCude((new EventCudeGenerator())->generate($event, $event->getSoftware()?->getPin() ?? ''));
+            }
+            $xml    = (new ApplicationResponseBuilder(null, $this->getEnvironmentCode()))->build($event);
+            $signed = $this->signer()->sign($xml);
+
+            $fileName = FileNameGenerator::base(FileNameGenerator::EVENTO, $event->getReceiver()?->getNit() ?? '', $event->getId(), $event->getIssueDate(), $this->providerCode);
+
+            return $this->getSoapClient()->sendEventUpdateStatus($signed, $event->getCude(), $fileName);
+        } catch (\Throwable $th) {
+            return Result::failure($th->getMessage());
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Consultas
+    // ------------------------------------------------------------------
+
+    /** Status by CUFE/CUDE (sync) or ZipKey (async / set de pruebas). */
+    public function getStatus(string $trackId): StatusResult
+    {
+        return $this->getSoapClient()->getStatusZip($trackId);
+    }
+
+    /**
+     * Polls DIAN until an async upload (set de pruebas, SendBillAsync) finishes.
+     */
+    public function waitForResult(string $zipKey, int $attempts = 10, int $delaySeconds = 3): StatusResult
+    {
+        $status = $this->getStatus($zipKey);
+        for ($i = 1; $i < $attempts && ($status->isProcessing() || $status->getStatusCode() === ''); $i++) {
+            sleep($delaySeconds);
+            $status = $this->getStatus($zipKey);
+        }
+
+        return $status;
+    }
+
+    /**
+     * Authorized numbering ranges with their TechnicalKey (clave técnica).
+     *
+     * @return list<array<string,string>>
+     */
+    public function getNumberingRanges(string $nit, string $softwareId, ?string $providerNit = null): array
+    {
+        return $this->getSoapClient()->getNumberingRanges($nit, $providerNit ?? $nit, $softwareId);
+    }
+
+    // ------------------------------------------------------------------
+    // Internals
+    // ------------------------------------------------------------------
+
+    /** @return array{string,string} [uuid, signedXml] */
+    private function buildSigned(Invoice|CreditNote|DebitNote $document): array
+    {
+        $uuid    = $this->getUuid($document);
+        $qr      = ($this->qrGenerator ?? new QrGenerator())->content($document, $uuid, $this->isProduction());
+        $builder = $this->xmlBuilder ?? new XmlBuilder(null, $this->getEnvironmentCode());
+
+        return [$uuid, $this->signer()->sign($builder->build($document, $uuid, $qr))];
+    }
+
+    /** @return array{string,string} [cuds, signedXml] */
+    private function buildSignedSupportDocument(SupportDocument $document): array
+    {
+        $cuds = (new CudsGenerator())->generate($document, $document->getSoftware()?->getPin() ?? '', $this->getEnvironmentCode());
+        $xml  = (new SupportDocumentBuilder(null, $this->getEnvironmentCode()))->build($document, $cuds);
+
+        return [$cuds, $this->signer()->sign($xml)];
+    }
+
+    private function keyOrPin(Invoice|CreditNote|DebitNote $document): string
+    {
+        return $document instanceof Invoice
             ? $document->getTechnicalKey()
-            : ($document->getSoftware() ? $document->getSoftware()->getPin() : '');
+            : ($document->getSoftware()?->getPin() ?? '');
+    }
 
-        $uuid      = $cufeGen->generate($document, $keyOrPin, $envFlag);
-        $qrCodeUrl = ($this->qrGenerator ?? new QrGenerator())
-            ->generate($document, $uuid, $this->environment === SoapClient::ENV_PRODUCCION);
-        $xml       = ($this->xmlBuilder ?? new XmlBuilder(null, $envFlag))->build($document, $uuid, $qrCodeUrl);
+    private function cufe(): CufeGenerator
+    {
+        return $this->cufeGenerator ??= new CufeGenerator();
+    }
 
-        return ($this->signer ?? new XadesSigner($this->certPath, $this->certPassword))->sign($xml);
+    private function signer(): XadesSigner
+    {
+        return $this->signer ??= XadesSigner::fromCertificate($this->getCertificate(), $this->signerRole);
+    }
+
+    private function blocked(PreflightReport $report, string $uuid): Result
+    {
+        return Result::failure(
+            'Validación previa al envío: ' . implode(' | ', $report->messages()),
+            $uuid,
+            $report->getSignedXml()
+        )->setErrors($report->messages());
     }
 }

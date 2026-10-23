@@ -14,8 +14,7 @@ trait HasDianCatalogHelpers
 {
     public function code(): string
     {
-        /** @var string $this->value */
-        return $this->value;
+        return (string) $this->value;
     }
 
     public static function tryFromCode(string $code): ?self
@@ -24,14 +23,13 @@ trait HasDianCatalogHelpers
     }
 
     /**
-     * @return array<string,string>  Map of code => description
+     * @return array<int|string,string>  Map of code => description (numeric codes become int keys)
      */
     public static function descriptions(): array
     {
         $out = [];
         foreach (self::cases() as $case) {
-            /** @var DianCatalogInterface $case */
-            $out[$case->value] = $case->description();
+            $out[(string) $case->value] = $case->description();
         }
         return $out;
     }

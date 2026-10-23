@@ -4,20 +4,10 @@ declare(strict_types=1);
 
 namespace RoyaltyFusion\DianPhp\Bridge\Symfony\DependencyInjection;
 
-use RoyaltyFusion\DianPhp\Dian;
-use RoyaltyFusion\DianPhp\Report\HtmlReport;
-use RoyaltyFusion\DianPhp\Signer\XadesSigner;
-use RoyaltyFusion\DianPhp\Validator\BusinessRuleValidator;
-use RoyaltyFusion\DianPhp\Validator\XsdValidator;
-use RoyaltyFusion\DianPhp\Ws\SoapClient;
-use RoyaltyFusion\DianPhp\Xml\CufeGenerator;
-use RoyaltyFusion\DianPhp\Xml\QrGenerator;
-use RoyaltyFusion\DianPhp\Xml\XmlBuilder;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 use Symfony\Component\DependencyInjection\Extension\Extension;
-use Symfony\Component\DependencyInjection\Reference;
 
 final class DianExtension extends Extension
 {
@@ -43,6 +33,9 @@ final class DianExtension extends Extension
         $container->setParameter('dian.software.id', $config['software']['id'] ?? '');
         $container->setParameter('dian.software.pin', $config['software']['pin'] ?? '');
         $container->setParameter('dian.software.provider_nit', $config['software']['provider_nit'] ?? '');
+        $container->setParameter('dian.software.provider_code', $config['software']['provider_code'] ?? '000');
+        $container->setParameter('dian.nit', $config['nit']);
+        $container->setParameter('dian.signer_role', $config['signer_role']);
         $container->setParameter('dian.report.logo_url', $config['report']['logo_url']);
         $container->setParameter('dian.report.accent_color', $config['report']['accent_color']);
     }

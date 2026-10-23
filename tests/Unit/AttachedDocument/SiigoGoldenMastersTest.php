@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoyaltyFusion\DianPhp\Tests\Unit\AttachedDocument;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RoyaltyFusion\DianPhp\AttachedDocument\AttachedDocumentParser;
 
@@ -39,7 +40,7 @@ final class SiigoGoldenMastersTest extends TestCase
         ];
     }
 
-    /** @dataProvider fixtureProvider */
+    #[DataProvider('fixtureProvider')]
     public function testEveryFixtureIsAcceptedAndExposesEmbeddedDocs(
         string $filename,
         string $expectedParentDocId,

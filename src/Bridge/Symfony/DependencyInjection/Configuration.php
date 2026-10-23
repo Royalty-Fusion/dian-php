@@ -12,6 +12,8 @@ use Symfony\Component\Config\Definition\ConfigurationInterface;
  *
  *   dian:
  *     environment: habilitacion # or 'produccion'
+ *     nit: '900123456'              # NIT del facturador (dian:doctor)
+ *     signer_role: supplier         # or 'third party' for proveedores tecnológicos
  *     certificate:
  *       path: '%kernel.project_dir%/config/certs/empresa.p12'
  *       password: '%env(DIAN_CERT_PASSWORD)%'
@@ -19,6 +21,7 @@ use Symfony\Component\Config\Definition\ConfigurationInterface;
  *       id: '%env(DIAN_SOFT_ID)%'
  *       pin: '%env(DIAN_SOFT_PIN)%'
  *       provider_nit: '900123456'
+ *       provider_code: '000'          # PPP in the file names
  *     validate_before_send: true
  *     report:
  *       logo_url: '/img/logo.png'
@@ -35,6 +38,8 @@ final class Configuration implements ConfigurationInterface
             ->children()
                 ->enumNode('environment')->values(['habilitacion', 'produccion'])->defaultValue('habilitacion')->end()
                 ->booleanNode('validate_before_send')->defaultTrue()->end()
+                ->scalarNode('nit')->defaultValue('')->end()
+                ->enumNode('signer_role')->values(['supplier', 'third party'])->defaultValue('supplier')->end()
                 ->arrayNode('certificate')
                     ->isRequired()
                     ->children()
@@ -43,10 +48,12 @@ final class Configuration implements ConfigurationInterface
                     ->end()
                 ->end()
                 ->arrayNode('software')
+                    ->addDefaultsIfNotSet()
                     ->children()
                         ->scalarNode('id')->defaultValue('')->end()
                         ->scalarNode('pin')->defaultValue('')->end()
                         ->scalarNode('provider_nit')->defaultValue('')->end()
+                        ->scalarNode('provider_code')->defaultValue('000')->end()
                     ->end()
                 ->end()
                 ->arrayNode('report')

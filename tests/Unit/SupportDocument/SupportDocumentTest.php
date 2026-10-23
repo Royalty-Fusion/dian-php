@@ -79,8 +79,8 @@ final class SupportDocumentTest extends TestCase
         $xml  = $signer->sign((new SupportDocumentBuilder())->build($ds, $cuds));
         $this->assertSame([], $xsd->validate($xml)->messages());
 
-        $note = (new SupportDocumentAdjustmentNote())
-            ->setPrefijo('NA')->setNumero('1')
+        $note = new SupportDocumentAdjustmentNote();
+        $note->setPrefijo('NA')->setNumero('1')
             ->setFecha(new \DateTimeImmutable('2026-05-31T10:00:00-05:00'))
             ->setCompany($ds->getCompany() ?? new Company())
             ->setSupplier($ds->getSupplier() ?? new Client())

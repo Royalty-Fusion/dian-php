@@ -44,6 +44,7 @@ final class InvoicePipelineTest extends TestCase
         // 1. Validate
         $validation = (new BusinessRuleValidator())->validate($invoice);
         $this->assertTrue($validation->isValid(), implode("\n", $validation->messages()));
+        $this->assertSame(94050.0, \RoyaltyFusion\DianPhp\Xml\DocumentCalculator::totals($invoice)['payableAmount']);
 
         // 2. Generate UUID + QR
         $cufeGen = new CufeGenerator();
@@ -124,11 +125,12 @@ final class InvoicePipelineTest extends TestCase
             ->setDateFrom(new \DateTimeImmutable('2026-01-01'))
             ->setDateTo(new \DateTimeImmutable('2026-12-31'));
 
+        // The line is worth 95000 after its discount: that is the taxable base.
         $iva = (new Tax())->setCode('01')->setName('IVA')->setPercent(19.0)
-            ->setBase(100000.0)->setAmount(19000.0);
+            ->setBase(95000.0)->setAmount(18050.0);
 
-        $reteFuente = (new Tax())->setCode('06')->setName('ReteFuente')->setPercent(2.5)
-            ->setBase(100000.0)->setAmount(2500.0)->setIsRetention(true);
+        $reteFuente = (new Tax())->setCode('06')->setName('ReteRenta')->setPercent(2.5)
+            ->setBase(95000.0)->setAmount(2375.0)->setIsRetention(true);
 
         $item = (new Item())
             ->setDescripcion('Consultoría TI')
@@ -154,12 +156,11 @@ final class InvoicePipelineTest extends TestCase
             ->setClient($client)
             ->setSoftware($software)
             ->setResolution($resolution)
-            ->setTechnicalKey('tech-key-test')
+            ->setTechnicalKey('fc8eac422eba16e22ffd8c6f94b3f40a6e38162c')
             // lineExt = 100000 - 5000 (desc. línea) = 95000
-            // taxExcl = 95000 - 500 (desc. cab.) + 1500 (cargo cab.) = 96000
-            // taxIncl = 96000 + 19000 (IVA, no rete) = 115000
-            // payable = 115000 - 20000 (anticipo) = 95000
-            ->setTotal(95000.0)
+            // taxIncl = 95000 + 18050 (IVA) = 113050
+            // payable = 113050 - 500 (desc. global) + 1500 (cargo global) - 20000 (anticipo) = 94050
+            ->setTotal(94050.0)
             ->addItem($item)
             ->addTax($iva)
             ->addTax($reteFuente)

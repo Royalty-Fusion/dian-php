@@ -119,7 +119,7 @@ final class MunicipioRegistry
      * Maps the soenac/api-dian department row ID to the DANE 2-digit code.
      * The CSV ships department_id as the row PK, not the DANE code.
      *
-     * @var array<string,string>
+     * @var array<int|string,string>
      */
     private const DEPT_ID_TO_DANE = [
         '1'  => '91', '2'  => '05', '3'  => '81', '4'  => '08', '5'  => '11',

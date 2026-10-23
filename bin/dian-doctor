@@ -1,0 +1,69 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/*
+ * Diagnóstico del entorno DIAN para cualquier proyecto PHP:
+ *
+ *   vendor/bin/dian-doctor --cert=/ruta/cert.p12 --password=clave \
+ *       [--env=habilitacion|produccion] [--nit=900123456] \
+ *       [--software-id=UUID] [--provider-nit=900123456] [--json]
+ *
+ * Variables de entorno equivalentes: DIAN_CERT_PATH, DIAN_CERT_PASSWORD,
+ * DIAN_ENVIRONMENT, DIAN_NIT, DIAN_SOFTWARE_ID, DIAN_PROVIDER_NIT.
+ * Exit code 0 = listo, 1 = hay errores.
+ */
+
+foreach ([__DIR__ . '/../vendor/autoload.php', __DIR__ . '/../../../autoload.php'] as $autoload) {
+    if (is_file($autoload)) {
+        require $autoload;
+        break;
+    }
+}
+
+use RoyaltyFusion\DianPhp\Tools\Doctor;
+
+$opts = getopt('', ['cert:', 'password:', 'env:', 'nit:', 'software-id:', 'provider-nit:', 'json', 'help']);
+if (isset($opts['help'])) {
+    fwrite(STDOUT, "Uso: dian-doctor --cert=cert.p12 --password=clave [--env=habilitacion] [--nit=] [--software-id=] [--provider-nit=] [--json]\n");
+    exit(0);
+}
+$get = static fn (string $opt, string $env, ?string $default = null): ?string
+    => isset($opts[$opt]) ? (string) $opts[$opt] : (getenv($env) !== false ? (string) getenv($env) : $default);
+
+$cert = $get('cert', 'DIAN_CERT_PATH');
+if ($cert === null) {
+    fwrite(STDERR, "Falta --cert (o DIAN_CERT_PATH).\n");
+    exit(2);
+}
+
+$doctor = new Doctor();
+$report = $doctor->run(
+    $cert,
+    (string) $get('password', 'DIAN_CERT_PASSWORD', ''),
+    (string) $get('env', 'DIAN_ENVIRONMENT', 'habilitacion'),
+    $get('nit', 'DIAN_NIT'),
+    $get('software-id', 'DIAN_SOFTWARE_ID'),
+    $get('provider-nit', 'DIAN_PROVIDER_NIT')
+);
+
+if (isset($opts['json'])) {
+    fwrite(STDOUT, json_encode($report->toArray() + ['ranges' => $doctor->getRanges()], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n");
+} else {
+    fwrite(STDOUT, $report->toText() . "\n");
+    foreach ($doctor->getRanges() as $range) {
+        fwrite(STDOUT, sprintf(
+            "  Resolución %s  prefijo %s  %s-%s  vigencia %s a %s\n  Clave técnica: %s\n",
+            $range['ResolutionNumber'] ?? '?',
+            $range['Prefix'] ?? '',
+            $range['FromNumber'] ?? '?',
+            $range['ToNumber'] ?? '?',
+            $range['ValidDateFrom'] ?? '?',
+            $range['ValidDateTo'] ?? '?',
+            $range['TechnicalKey'] ?? '?'
+        ));
+    }
+}
+
+exit($report->isReady() ? 0 : 1);

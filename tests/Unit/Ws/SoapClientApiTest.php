@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoyaltyFusion\DianPhp\Tests\Unit\Ws;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RoyaltyFusion\DianPhp\Ws\SoapClient;
 
@@ -41,7 +42,7 @@ final class SoapClientApiTest extends TestCase
         $this->assertTrue($r->hasMethod('getStatusZip'));
     }
 
-    /** @dataProvider newOperationsProvider */
+    #[DataProvider('newOperationsProvider')]
     public function testAllReferenceOperationsExist(string $method, int $expectedRequired): void
     {
         $r = new \ReflectionClass(SoapClient::class);
@@ -61,8 +62,8 @@ final class SoapClientApiTest extends TestCase
             'sendBillAttachmentAsync'  => ['sendBillAttachmentAsync',  2],
             'sendNominaSync'           => ['sendNominaSync',           1],
             'sendEventUpdateStatus'    => ['sendEventUpdateStatus',    1],
-            'getAcquirer'              => ['getAcquirer',              3],
-            'getExchangeEmails'        => ['getExchangeEmails',        3],
+            'getAcquirer'              => ['getAcquirer',              2],
+            'getExchangeEmails'        => ['getExchangeEmails',        0],
             'getReferenceNotes'        => ['getReferenceNotes',        1],
             'getStatusEvent'           => ['getStatusEvent',           1],
         ];

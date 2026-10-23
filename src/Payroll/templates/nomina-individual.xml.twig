@@ -5,10 +5,14 @@
 {% set tra = doc.trabajador %}
 {% set per = doc.periodo %}
 {% set pag = doc.pago %}
-<fe:NominaIndividual xmlns:fe="dian:gov:co:facturaelectronica:NominaIndividual"
-                     xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
-                     xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2"
-                     SchemaLocation="dian:gov:co:facturaelectronica:NominaIndividual NominaIndividualElectronicaXSD.xsd">
+<NominaIndividual xmlns="dian:gov:co:facturaelectronica:NominaIndividual"
+                  xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+                  xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2"
+                  xmlns:xades="http://uri.etsi.org/01903/v1.3.2#"
+                  xmlns:xades141="http://uri.etsi.org/01903/v1.4.1#"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  SchemaLocation=""
+                  xsi:schemaLocation="dian:gov:co:facturaelectronica:NominaIndividual NominaIndividualElectronicaXSD.xsd">
     <ext:UBLExtensions>
         <ext:UBLExtension>
             <ext:ExtensionContent/>
@@ -183,4 +187,4 @@
         {% if ded.reintegro > 0 %}<Reintegro Deduccion="{{ ded.reintegro|number_format(2, '.', '') }}"/>{% endif %}
         {% if ded.deuda > 0 %}<Deuda Deduccion="{{ ded.deuda|number_format(2, '.', '') }}"/>{% endif %}
     </Deducciones>
-</fe:NominaIndividual>
+</NominaIndividual>

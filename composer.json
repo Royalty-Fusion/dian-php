@@ -3,7 +3,15 @@
     "description": "SDK Open Source en PHP para Facturación Electrónica de la DIAN (Colombia) - UBL 2.1 Anexo Técnico V1.9",
     "type": "library",
     "license": "MIT",
-    "keywords": ["dian", "colombia", "facturacion-electronica", "ubl", "ubl-2.1", "xades", "sdk"],
+    "keywords": [
+        "dian",
+        "colombia",
+        "facturacion-electronica",
+        "ubl",
+        "ubl-2.1",
+        "xades",
+        "sdk"
+    ],
     "authors": [
         {
             "name": "Daniel Muñoz",
@@ -18,7 +26,7 @@
         "ext-openssl": "*",
         "ext-zip": "*",
         "ext-json": "*",
-        "robrichards/xmlseclibs": "^3.1",
+        "psr/log": "^1.1 || ^2.0 || ^3.0",
         "symfony/http-client": "^6.0 || ^7.0",
         "twig/twig": "^3.0"
     },
@@ -60,5 +68,8 @@
         "sort-packages": true
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "bin": [
+        "bin/dian-doctor"
+    ]
 }
