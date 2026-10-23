@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace RoyaltyFusion\DianPhp\Model;
 
+use RoyaltyFusion\DianPhp\Catalog\TipoFactura;
+
 class Invoice
 {
     use HasRichDocumentFields;
+    use HasDocumentOptions;
+
+    private string $invoiceTypeCode = '01';
 
     private string $prefijo;
     private string $numero;
@@ -179,5 +184,25 @@ class Invoice
     public function getTestSetId(): string
     {
         return $this->testSetId ?? '';
+    }
+
+    protected function defaultCustomizationId(): string
+    {
+        return '10';
+    }
+
+    /**
+     * Tipo de factura (cbc:InvoiceTypeCode): 01 venta nacional, 02 exportación,
+     * 03 contingencia facturador, 04 contingencia DIAN.
+     */
+    public function setTipoFactura(TipoFactura|string $tipoFactura): self
+    {
+        $this->invoiceTypeCode = $tipoFactura instanceof TipoFactura ? $tipoFactura->value : $tipoFactura;
+        return $this;
+    }
+
+    public function getInvoiceTypeCode(): string
+    {
+        return $this->invoiceTypeCode;
     }
 }

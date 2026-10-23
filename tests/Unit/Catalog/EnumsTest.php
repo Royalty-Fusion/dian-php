@@ -37,7 +37,7 @@ final class EnumsTest extends TestCase
             'TipoOrganizacion'           => [TipoOrganizacion::class,            '1',     'Persona Jurídica y asimiladas'],
             'TipoRegimen'                => [TipoRegimen::class,                 '48',    'Responsable de IVA'],
             'Responsabilidad'            => [Responsabilidad::class,             'O-47',  'Régimen Simple de Tributación – SIMPLE'],
-            'Tributo'                    => [Tributo::class,                     '01',    'IVA'],
+            'Tributo'                    => [Tributo::class,                     '01',    'Impuesto sobre las Ventas'],
             'FormaPago'                  => [FormaPago::class,                   '2',     'Crédito'],
             'MedioPago'                  => [MedioPago::class,                   '42',    'Consignación cuenta'],
             'UnidadMedida'               => [UnidadMedida::class,                'EA',    'Unidad'],

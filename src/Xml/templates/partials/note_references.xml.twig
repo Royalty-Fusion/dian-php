@@ -1,0 +1,23 @@
+{#- InvoicePeriod + DiscrepancyResponse + BillingReference (shared by NC/ND) -#}
+{% if doc.invoicePeriodStart %}
+    <cac:InvoicePeriod>
+        <cbc:StartDate>{{ doc.invoicePeriodStart|date('Y-m-d') }}</cbc:StartDate>
+        <cbc:EndDate>{{ doc.invoicePeriodEnd|date('Y-m-d') }}</cbc:EndDate>
+    </cac:InvoicePeriod>
+    {% endif %}
+    {% if doc.discrepancyResponse %}
+    <cac:DiscrepancyResponse>
+        <cbc:ReferenceID>{{ doc.discrepancyResponse.referenceId ?: (doc.billingReference ? doc.billingReference.number) }}</cbc:ReferenceID>
+        <cbc:ResponseCode>{{ doc.discrepancyResponse.responseCode }}</cbc:ResponseCode>
+        <cbc:Description>{{ doc.discrepancyResponse.description }}</cbc:Description>
+    </cac:DiscrepancyResponse>
+    {% endif %}
+    {% if doc.billingReference %}
+    <cac:BillingReference>
+        <cac:InvoiceDocumentReference>
+            <cbc:ID>{{ doc.billingReference.number }}</cbc:ID>
+            <cbc:UUID schemeName="CUFE-SHA384">{{ doc.billingReference.uuid }}</cbc:UUID>
+            <cbc:IssueDate>{{ doc.billingReference.date|date('Y-m-d') }}</cbc:IssueDate>
+        </cac:InvoiceDocumentReference>
+    </cac:BillingReference>
+    {% endif %}

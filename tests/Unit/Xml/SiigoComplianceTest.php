@@ -22,10 +22,14 @@ use RoyaltyFusion\DianPhp\Xml\XmlBuilder;
  */
 final class SiigoComplianceTest extends TestCase
 {
-    public function testUuidSchemeIdDefaultsTo1MatchingSiigo(): void
+    public function testUuidSchemeIdFollowsTheEnvironment(): void
     {
-        $xml = (new XmlBuilder())->build($this->buildExportInvoice(), str_repeat('a', 96), 'https://example.test/qr');
-        $this->assertStringContainsString('<cbc:UUID schemeID="1" schemeName="CUFE-SHA384">', $xml);
+        // Siigo production documents carry schemeID="1" = ambiente de producción.
+        $prod = (new XmlBuilder(null, '1'))->build($this->buildExportInvoice(), str_repeat('a', 96), 'https://example.test/qr');
+        $this->assertStringContainsString('<cbc:UUID schemeID="1" schemeName="CUFE-SHA384">', $prod);
+
+        $hab = (new XmlBuilder())->build($this->buildExportInvoice(), str_repeat('a', 96), 'https://example.test/qr');
+        $this->assertStringContainsString('<cbc:UUID schemeID="2" schemeName="CUFE-SHA384">', $hab);
     }
 
     public function testUuidSchemeIdCanBeForcedTo2(): void

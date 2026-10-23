@@ -7,6 +7,7 @@ namespace RoyaltyFusion\DianPhp\Model;
 class DebitNote
 {
     use HasRichDocumentFields;
+    use HasDocumentOptions;
 
     private string $prefijo;
     private string $numero;
@@ -191,5 +192,10 @@ class DebitNote
     public function getTestSetId(): string
     {
         return $this->testSetId ?? '';
+    }
+
+    protected function defaultCustomizationId(): string
+    {
+        return isset($this->billingReference) ? '30' : '32';
     }
 }

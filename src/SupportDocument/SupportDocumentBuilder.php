@@ -5,15 +5,17 @@ declare(strict_types=1);
 namespace RoyaltyFusion\DianPhp\SupportDocument;
 
 use RoyaltyFusion\DianPhp\Catalog\TipoAmbiente;
+use RoyaltyFusion\DianPhp\Model\NitDvCalculator;
+use RoyaltyFusion\DianPhp\Xml\DocumentCalculator;
+use RoyaltyFusion\DianPhp\Xml\QrGenerator;
+use RoyaltyFusion\DianPhp\Xml\TwigFactory;
 use Twig\Environment;
-use Twig\Loader\FilesystemLoader;
 
 /**
- * Renderer of the Documento Soporte UBL XML (DIAN Anexo DS v1.2).
+ * Renderer of the Documento Soporte (Invoice, InvoiceTypeCode 05) and of its
+ * nota de ajuste (CreditNote, CreditNoteTypeCode 95).
  *
- * Mirror of {@see \RoyaltyFusion\DianPhp\Xml\XmlBuilder} but for the DS
- * family. Kept in its own module so its evolution stays decoupled from the
- * Invoice/CN/DN stack.
+ * Shares partials, escaping and the totals calculator with the invoice stack.
  */
 class SupportDocumentBuilder
 {
@@ -22,55 +24,39 @@ class SupportDocumentBuilder
 
     public function __construct(?Environment $twig = null, string $environment = TipoAmbiente::HABILITACION->value)
     {
-        if ($twig instanceof Environment) {
-            $this->twig = $twig;
-        } else {
-            $loader = new FilesystemLoader(__DIR__ . '/templates');
-            $this->twig = new Environment($loader, [
-                'autoescape'       => false,
-                'strict_variables' => false,
-            ]);
-        }
+        $this->twig        = $twig ?? TwigFactory::create(__DIR__ . '/templates', dirname(__DIR__) . '/Xml/templates');
         $this->environment = $environment;
     }
 
-    public function build(SupportDocument $document, string $cuds, string $qrCodeUrl): string
+    /**
+     * @param string $qrCode sts:QRCode content; defaults to the VPFE consultation URL.
+     */
+    public function build(SupportDocument $document, string $cuds, string $qrCode = ''): string
     {
-        // Re-use DocumentCalculator pattern for totals.
-        $lineExtensionAmount = 0.0;
-        foreach ($document->getItems() as $item) {
-            $lineExtensionAmount += $item->getCantidad() * $item->getPrecio();
-        }
-        $taxAmount = 0.0;
-        $taxGroups = [];
-        foreach ($document->getTaxes() as $tax) {
-            $taxAmount += $tax->isRetention() ? 0 : $tax->getAmount();
-            $code = $tax->getCode();
-            if (!isset($taxGroups[$code])) {
-                $taxGroups[$code] = ['amount' => 0.0, 'subtotals' => []];
-            }
-            $taxGroups[$code]['amount']     += $tax->getAmount();
-            $taxGroups[$code]['subtotals'][] = [
-                'base'    => $tax->getBase(),
-                'amount'  => $tax->getAmount(),
-                'percent' => $tax->getPercent(),
-                'code'    => $tax->getCode(),
-                'name'    => $tax->getName(),
-            ];
-        }
+        $totals      = DocumentCalculator::totals($document);
+        $providerNit = $document->getSoftware()?->getProviderNit()
+            ?: ($document->getCompany()?->getNit() ?? '');
+        $purchase    = $document->getPurchaseDate();
 
-        return $this->twig->render('supportdocument.xml.twig', [
-            'doc'           => $document,
-            'cuds'          => $cuds,
-            'qrCodeUrl'     => $qrCodeUrl,
-            'profileExecId' => $this->environment,
-            'totals'        => [
-                'lineExtensionAmount' => $lineExtensionAmount,
-                'taxExclusiveAmount'  => $lineExtensionAmount,
-                'taxInclusiveAmount'  => $lineExtensionAmount + $taxAmount,
-                'payableAmount'       => $lineExtensionAmount + $taxAmount,
-            ],
-            'taxGroups'     => $taxGroups,
-        ]);
+        return $this->twig->render(
+            $document instanceof SupportDocumentAdjustmentNote ? 'supportdocument-adjustment.xml.twig' : 'supportdocument.xml.twig',
+            [
+                'doc'           => $document,
+                'uuid'          => $cuds,
+                'cuds'          => $cuds,
+                'qrCode'        => $qrCode !== '' ? $qrCode : QrGenerator::url($cuds, $this->environment === TipoAmbiente::PRODUCCION->value),
+                'totals'        => $totals,
+                'currency'      => $document->getCurrencyCode() ?: 'COP',
+                'profileExecId' => $this->environment,
+                'uuidSchemeId'  => $this->environment,
+                'providerNit'   => $providerNit,
+                'providerDv'    => NitDvCalculator::compute($providerNit),
+                'linePeriod'    => [
+                    'startDate'   => $purchase ? DocumentCalculator::issueDateTime($purchase)[0] : $totals['issueDate'],
+                    'code'        => $document->getTransmissionCode(),
+                    'description' => $document->getTransmissionDescription(),
+                ],
+            ]
+        );
     }
 }

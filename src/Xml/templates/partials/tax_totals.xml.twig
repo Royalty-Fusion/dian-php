@@ -1,0 +1,10 @@
+{#- params: groups, tag ('TaxTotal' | 'WithholdingTaxTotal'), currency -#}
+{% for code, group in groups %}
+    <cac:{{ tag }}>
+        <cbc:TaxAmount currencyID="{{ currency }}">{{ group.amount|money }}</cbc:TaxAmount>
+        {% if tag == 'TaxTotal' %}<cbc:RoundingAmount currencyID="{{ currency }}">0.00</cbc:RoundingAmount>{% endif %}
+        {% for sub in group.subtotals %}
+        {% include '@dian/tax_subtotal.xml.twig' with {sub: sub, currency: currency} only %}
+        {% endfor %}
+    </cac:{{ tag }}>
+{% endfor %}

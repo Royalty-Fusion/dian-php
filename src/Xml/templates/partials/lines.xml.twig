@@ -1,0 +1,67 @@
+{#- params: doc, totals, lineTag, qtyTag, currency, chargesFirst (bool: InvoiceLine puts AllowanceCharge before TaxTotal), linePeriod (optional, Documento Soporte) -#}
+{% for item in doc.items %}
+    {% set calc = totals.lines[loop.index0] %}
+    <cac:{{ lineTag }}>
+        <cbc:ID>{{ loop.index }}</cbc:ID>
+        {% if item.note %}<cbc:Note>{{ item.note }}</cbc:Note>{% endif %}
+        <cbc:{{ qtyTag }} unitCode="{{ item.unitCode }}">{{ item.cantidad|money(6)|trim('0', 'right')|trim('.', 'right') }}</cbc:{{ qtyTag }}>
+        <cbc:LineExtensionAmount currencyID="{{ currency }}">{{ calc.lineExtensionAmount|money }}</cbc:LineExtensionAmount>
+        {% if linePeriod is defined and linePeriod %}
+        <cac:InvoicePeriod>
+            <cbc:StartDate>{{ linePeriod.startDate }}</cbc:StartDate>
+            <cbc:DescriptionCode>{{ linePeriod.code }}</cbc:DescriptionCode>
+            <cbc:Description>{{ linePeriod.description }}</cbc:Description>
+        </cac:InvoicePeriod>
+        {% endif %}
+        {% if item.precio == 0 %}
+        <cac:PricingReference>
+            <cac:AlternativeConditionPrice>
+                <cbc:PriceAmount currencyID="{{ currency }}">{{ item.referencePrice|money }}</cbc:PriceAmount>
+                <cbc:PriceTypeCode>01</cbc:PriceTypeCode>
+            </cac:AlternativeConditionPrice>
+        </cac:PricingReference>
+        {% endif %}
+        {% if chargesFirst %}
+        {% for ac in item.allowanceCharges %}
+        {% include '@dian/allowance_charge.xml.twig' with {ac: ac, currency: currency} only %}
+        {% endfor %}
+        {% endif %}
+        {% for sub in calc.taxes %}
+        <cac:TaxTotal>
+            <cbc:TaxAmount currencyID="{{ currency }}">{{ sub.amount|money }}</cbc:TaxAmount>
+            {% include '@dian/tax_subtotal.xml.twig' with {sub: sub, currency: currency} only %}
+        </cac:TaxTotal>
+        {% endfor %}
+        {% if lineTag == 'InvoiceLine' %}
+        {% for sub in calc.withholdings %}
+        <cac:WithholdingTaxTotal>
+            <cbc:TaxAmount currencyID="{{ currency }}">{{ sub.amount|money }}</cbc:TaxAmount>
+            {% include '@dian/tax_subtotal.xml.twig' with {sub: sub, currency: currency} only %}
+        </cac:WithholdingTaxTotal>
+        {% endfor %}
+        {% endif %}
+        {% if not chargesFirst %}
+        {% for ac in item.allowanceCharges %}
+        {% include '@dian/allowance_charge.xml.twig' with {ac: ac, currency: currency} only %}
+        {% endfor %}
+        {% endif %}
+        <cac:Item>
+            <cbc:Description>{{ item.descripcion }}</cbc:Description>
+            {% if item.brandName %}<cbc:BrandName>{{ item.brandName }}</cbc:BrandName>{% endif %}
+            {% if item.modelName %}<cbc:ModelName>{{ item.modelName }}</cbc:ModelName>{% endif %}
+            {% if item.sellersItemIdentification %}
+            <cac:SellersItemIdentification>
+                <cbc:ID>{{ item.sellersItemIdentification }}</cbc:ID>
+            </cac:SellersItemIdentification>
+            {% endif %}
+            {% set agency = {'001': '10', '010': '9', '020': '195'}[item.codeScheme] ?? null %}
+            <cac:StandardItemIdentification>
+                <cbc:ID schemeID="{{ item.codeScheme }}"{% if agency %} schemeAgencyID="{{ agency }}"{% endif %}>{{ item.code ?: (item.sellersItemIdentification ?: loop.index) }}</cbc:ID>
+            </cac:StandardItemIdentification>
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="{{ currency }}">{{ item.precio|money }}</cbc:PriceAmount>
+            <cbc:BaseQuantity unitCode="{{ item.unitCode }}">{{ item.cantidad|money(6)|trim('0', 'right')|trim('.', 'right') }}</cbc:BaseQuantity>
+        </cac:Price>
+    </cac:{{ lineTag }}>
+{% endfor %}

@@ -12,7 +12,13 @@ use RoyaltyFusion\DianPhp\Model\Software;
 use RoyaltyFusion\DianPhp\Model\Tax;
 use RoyaltyFusion\DianPhp\SupportDocument\CudsGenerator;
 use RoyaltyFusion\DianPhp\SupportDocument\SupportDocument;
+use RoyaltyFusion\DianPhp\SupportDocument\SupportDocumentAdjustmentNote;
 use RoyaltyFusion\DianPhp\SupportDocument\SupportDocumentBuilder;
+use RoyaltyFusion\DianPhp\Model\BillingReference;
+use RoyaltyFusion\DianPhp\Model\DiscrepancyResponse;
+use RoyaltyFusion\DianPhp\Signer\XadesSigner;
+use RoyaltyFusion\DianPhp\Tests\Support\TestCertificate;
+use RoyaltyFusion\DianPhp\Validator\XsdValidator;
 
 final class SupportDocumentTest extends TestCase
 {
@@ -39,12 +45,53 @@ final class SupportDocumentTest extends TestCase
         $dom = new \DOMDocument();
         $this->assertTrue($dom->loadXML($xml));
         $this->assertSame('Invoice', $dom->documentElement->localName);
-        $this->assertStringContainsString('<cbc:CustomizationID>11</cbc:CustomizationID>', $xml);
-        $this->assertStringContainsString('<cbc:InvoiceTypeCode', $xml);
-        $this->assertStringContainsString('>05</cbc:InvoiceTypeCode>', $xml);
-        $this->assertStringContainsString('<cbc:UUID schemeID="1" schemeName="CUDS-SHA384">' . $cuds, $xml);
-        // Roles inverted: our Company is the AccountingSupplierParty
-        $this->assertStringContainsString('Documento Soporte Electrónico', $xml);
+        $this->assertStringContainsString('<cbc:CustomizationID>10</cbc:CustomizationID>', $xml);
+        $this->assertStringContainsString('<cbc:InvoiceTypeCode>05</cbc:InvoiceTypeCode>', $xml);
+        $this->assertStringContainsString('<cbc:UUID schemeID="2" schemeName="CUDS-SHA384">' . $cuds, $xml);
+        $this->assertStringContainsString('<cbc:DescriptionCode>1</cbc:DescriptionCode>', $xml);
+
+        // Seller (no obligado) is the supplier party, the issuing company the customer party.
+        $xpath = new \DOMXPath($dom);
+        $xpath->registerNamespace('cac', 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2');
+        $xpath->registerNamespace('cbc', 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2');
+        $this->assertSame('1010101010', $xpath->evaluate('string(//cac:AccountingSupplierParty//cac:PartyTaxScheme/cbc:CompanyID)'));
+        $this->assertSame('901234567', $xpath->evaluate('string(//cac:AccountingCustomerParty//cac:PartyTaxScheme/cbc:CompanyID)'));
+
+        $nonResident = (new SupportDocumentBuilder())->build($this->buildDs()->setCustomizationId(SupportDocument::NO_RESIDENTE), $cuds);
+        $this->assertStringContainsString('<cbc:CustomizationID>11</cbc:CustomizationID>', $nonResident);
+    }
+
+    public function testCudsFollowsTheAnexoFormula(): void
+    {
+        $this->assertSame(
+            'DS12026-05-3010:00:00-05:0050000.00019500.0059500.001010101010901234567123452',
+            (new CudsGenerator())->buildString($this->buildDs(), '12345', CudsGenerator::ENV_HABILITACION)
+        );
+    }
+
+    public function testSignedSupportDocumentAndAdjustmentNoteAreSchemaValid(): void
+    {
+        $signer = new XadesSigner(TestCertificate::path(), TestCertificate::PASSWORD);
+        $xsd    = new XsdValidator();
+
+        $ds   = $this->buildDs();
+        $cuds = (new CudsGenerator())->generate($ds, '12345');
+        $xml  = $signer->sign((new SupportDocumentBuilder())->build($ds, $cuds));
+        $this->assertSame([], $xsd->validate($xml)->messages());
+
+        $note = (new SupportDocumentAdjustmentNote())
+            ->setPrefijo('NA')->setNumero('1')
+            ->setFecha(new \DateTimeImmutable('2026-05-31T10:00:00-05:00'))
+            ->setCompany($ds->getCompany() ?? new Company())
+            ->setSupplier($ds->getSupplier() ?? new Client())
+            ->setSoftware($ds->getSoftware() ?? new Software())
+            ->addItem($ds->getItems()[0]);
+        $note->setBillingReference((new BillingReference())->setNumber('DS1')->setUuid($cuds)->setDate(new \DateTimeImmutable('2026-05-30')));
+        $note->setDiscrepancyResponse((new DiscrepancyResponse())->setResponseCode('2')->setDescription('Anulación'));
+
+        $noteXml = $signer->sign((new SupportDocumentBuilder())->build($note, (new CudsGenerator())->generate($note, '12345')));
+        $this->assertSame([], $xsd->validate($noteXml)->messages());
+        $this->assertStringContainsString('<cbc:CreditNoteTypeCode>95</cbc:CreditNoteTypeCode>', $noteXml);
     }
 
     private function buildDs(): SupportDocument

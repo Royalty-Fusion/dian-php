@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace RoyaltyFusion\DianPhp\Payroll;
 
 use Twig\Environment;
-use Twig\Loader\FilesystemLoader;
+use RoyaltyFusion\DianPhp\Xml\TwigFactory;
 
 /**
  * Renderer of the Nómina Individual Electrónica XML.
@@ -16,15 +16,7 @@ class PayrollXmlBuilder
 
     public function __construct(?Environment $twig = null)
     {
-        if ($twig instanceof Environment) {
-            $this->twig = $twig;
-        } else {
-            $loader = new FilesystemLoader(__DIR__ . '/templates');
-            $this->twig = new Environment($loader, [
-                'autoescape'       => false,
-                'strict_variables' => false,
-            ]);
-        }
+        $this->twig = $twig ?? TwigFactory::create(__DIR__ . '/templates');
     }
 
     public function build(PayrollDocument $doc, string $cune, string $qrCodeUrl): string

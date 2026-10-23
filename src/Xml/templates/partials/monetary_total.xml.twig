@@ -1,0 +1,10 @@
+{#- params: totals, tag, currency, withPrepaid -#}
+<cac:{{ tag }}>
+        <cbc:LineExtensionAmount currencyID="{{ currency }}">{{ totals.lineExtensionAmount|money }}</cbc:LineExtensionAmount>
+        <cbc:TaxExclusiveAmount currencyID="{{ currency }}">{{ totals.taxExclusiveAmount|money }}</cbc:TaxExclusiveAmount>
+        <cbc:TaxInclusiveAmount currencyID="{{ currency }}">{{ totals.taxInclusiveAmount|money }}</cbc:TaxInclusiveAmount>
+        {% if totals.allowanceTotalAmount > 0 %}<cbc:AllowanceTotalAmount currencyID="{{ currency }}">{{ totals.allowanceTotalAmount|money }}</cbc:AllowanceTotalAmount>{% endif %}
+        {% if totals.chargeTotalAmount > 0 %}<cbc:ChargeTotalAmount currencyID="{{ currency }}">{{ totals.chargeTotalAmount|money }}</cbc:ChargeTotalAmount>{% endif %}
+        {% if withPrepaid and totals.prepaidAmount > 0 %}<cbc:PrepaidAmount currencyID="{{ currency }}">{{ totals.prepaidAmount|money }}</cbc:PrepaidAmount>{% endif %}
+        <cbc:PayableAmount currencyID="{{ currency }}">{{ totals.payableAmount|money }}</cbc:PayableAmount>
+    </cac:{{ tag }}>

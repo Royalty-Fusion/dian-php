@@ -6,6 +6,7 @@ namespace RoyaltyFusion\DianPhp\Radian;
 
 use RoyaltyFusion\DianPhp\Model\Client;
 use RoyaltyFusion\DianPhp\Model\Company;
+use RoyaltyFusion\DianPhp\Model\Software;
 
 /**
  * RADIAN event payload. The *receiver* (party that signs) is modelled as the
@@ -121,5 +122,68 @@ class EventDocument
     public function getSupplier(): ?Client
     {
         return $this->supplier;
+    }
+
+    private ?Software $software = null;
+    private string $documentTypeCode = '01';
+    /** @var array{id:string,idType:string,dv:string,firstName:string,familyName:string,jobTitle:string,department:string}|null */
+    private ?array $person = null;
+
+    /** Software DIAN of whoever sends the event (SoftwareID/PIN for CUDE and SoftwareSecurityCode). */
+    public function setSoftware(Software $software): self
+    {
+        $this->software = $software;
+        return $this;
+    }
+
+    public function getSoftware(): ?Software
+    {
+        return $this->software;
+    }
+
+    /** Tipo del documento referenciado (01 = factura electrónica de venta). */
+    public function setDocumentTypeCode(string $documentTypeCode): self
+    {
+        $this->documentTypeCode = $documentTypeCode;
+        return $this;
+    }
+
+    public function getDocumentTypeCode(): string
+    {
+        return $this->documentTypeCode;
+    }
+
+    /**
+     * Persona que realiza el evento — required by DIAN for 032 (recibo del bien
+     * o prestación del servicio) and recommended for 033/034.
+     */
+    public function setPerson(
+        string $id,
+        string $firstName,
+        string $familyName,
+        string $jobTitle = '',
+        string $department = '',
+        string $idType = '13',
+        string $dv = ''
+    ): self {
+        $this->person = compact('id', 'idType', 'dv', 'firstName', 'familyName', 'jobTitle', 'department');
+        return $this;
+    }
+
+    /** @return array{id:string,idType:string,dv:string,firstName:string,familyName:string,jobTitle:string,department:string}|null */
+    public function getPerson(): ?array
+    {
+        return $this->person;
+    }
+
+    /** Prefijo + número for the generic SoftwareSecurityCode partial. */
+    public function getPrefijo(): string
+    {
+        return '';
+    }
+
+    public function getNumero(): string
+    {
+        return $this->getId();
     }
 }

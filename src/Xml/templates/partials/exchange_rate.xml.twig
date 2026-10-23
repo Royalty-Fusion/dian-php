@@ -1,0 +1,9 @@
+{#- params: rate -#}
+<cac:PaymentExchangeRate>
+        <cbc:SourceCurrencyCode>{{ rate.sourceCurrencyCode }}</cbc:SourceCurrencyCode>
+        <cbc:SourceCurrencyBaseRate>{{ rate.sourceCurrencyBaseRate|money }}</cbc:SourceCurrencyBaseRate>
+        <cbc:TargetCurrencyCode>{{ rate.targetCurrencyCode }}</cbc:TargetCurrencyCode>
+        <cbc:TargetCurrencyBaseRate>{{ rate.targetCurrencyBaseRate|money }}</cbc:TargetCurrencyBaseRate>
+        <cbc:CalculationRate>{{ rate.calculationRate|money }}</cbc:CalculationRate>
+        {% if rate.date %}<cbc:Date>{{ rate.date|date('Y-m-d') }}</cbc:Date>{% endif %}
+    </cac:PaymentExchangeRate>

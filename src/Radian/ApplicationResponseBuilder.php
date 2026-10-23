@@ -4,35 +4,46 @@ declare(strict_types=1);
 
 namespace RoyaltyFusion\DianPhp\Radian;
 
+use RoyaltyFusion\DianPhp\Catalog\TipoAmbiente;
+use RoyaltyFusion\DianPhp\Model\NitDvCalculator;
+use RoyaltyFusion\DianPhp\Xml\DocumentCalculator;
+use RoyaltyFusion\DianPhp\Xml\QrGenerator;
+use RoyaltyFusion\DianPhp\Xml\TwigFactory;
 use Twig\Environment;
-use Twig\Loader\FilesystemLoader;
 
 /**
- * Renderer of RADIAN ApplicationResponse events (DIAN Anexo RADIAN v1.0).
+ * Renderer of RADIAN events (UBL ApplicationResponse).
  *
- * Each event is sent as a UBL ApplicationResponse signed by the *receiver*
- * (not the supplier) and registered against the CUFE of the original
- * invoice. Codes are listed in {@see ApplicationResponseEvent}.
+ * Structure follows the ApplicationResponse DIAN itself issues (see
+ * resources/fixtures): DianExtensions in the first UBLExtension and an empty
+ * second one for the XAdES signature of the party that generates the event.
+ * Codes are listed in {@see ApplicationResponseEvent}; the CUDE is computed
+ * with {@see EventCudeGenerator}.
  */
 class ApplicationResponseBuilder
 {
     private Environment $twig;
+    private string $environment;
 
-    public function __construct(?Environment $twig = null)
+    public function __construct(?Environment $twig = null, string $environment = TipoAmbiente::HABILITACION->value)
     {
-        if ($twig instanceof Environment) {
-            $this->twig = $twig;
-        } else {
-            $loader = new FilesystemLoader(__DIR__ . '/templates');
-            $this->twig = new Environment($loader, [
-                'autoescape'       => false,
-                'strict_variables' => false,
-            ]);
-        }
+        $this->twig        = $twig ?? TwigFactory::create(__DIR__ . '/templates');
+        $this->environment = $environment;
     }
 
     public function build(EventDocument $event): string
     {
-        return $this->twig->render('event.xml.twig', ['doc' => $event]);
+        [$date, $time] = DocumentCalculator::issueDateTime($event->getIssueDate());
+        $providerNit   = $event->getSoftware()?->getProviderNit() ?: ($event->getReceiver()?->getNit() ?? '');
+
+        return $this->twig->render('event.xml.twig', [
+            'doc'         => $event,
+            'environment' => $this->environment,
+            'issueDate'   => $date,
+            'issueTime'   => $time,
+            'providerNit' => $providerNit,
+            'providerDv'  => NitDvCalculator::compute($providerNit),
+            'qrCode'      => QrGenerator::url($event->getCude(), $this->environment === TipoAmbiente::PRODUCCION->value),
+        ]);
     }
 }

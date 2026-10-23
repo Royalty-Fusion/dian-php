@@ -111,4 +111,18 @@ class Company
         }
         return NitDvCalculator::compute($this->nit ?? '');
     }
+
+    private string $matriculaMercantil = '';
+
+    /** Número de matrícula mercantil (cac:CorporateRegistrationScheme/cbc:Name). */
+    public function setMatriculaMercantil(string $matriculaMercantil): self
+    {
+        $this->matriculaMercantil = $matriculaMercantil;
+        return $this;
+    }
+
+    public function getMatriculaMercantil(): string
+    {
+        return $this->matriculaMercantil;
+    }
 }

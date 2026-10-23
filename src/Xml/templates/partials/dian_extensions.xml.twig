@@ -1,0 +1,38 @@
+{#- DIAN extension (UBLExtension #1) + empty slot for the XAdES signature (#2). -#}
+<ext:UBLExtensions>
+        <ext:UBLExtension>
+            <ext:ExtensionContent>
+                <sts:DianExtensions>
+                    {% if withControl and doc.resolution %}
+                    <sts:InvoiceControl>
+                        <sts:InvoiceAuthorization>{{ doc.resolution.number }}</sts:InvoiceAuthorization>
+                        <sts:AuthorizationPeriod>
+                            <cbc:StartDate>{{ doc.resolution.dateFrom|date('Y-m-d') }}</cbc:StartDate>
+                            <cbc:EndDate>{{ doc.resolution.dateTo|date('Y-m-d') }}</cbc:EndDate>
+                        </sts:AuthorizationPeriod>
+                        <sts:AuthorizedInvoices>
+                            {% if doc.resolution.prefix %}<sts:Prefix>{{ doc.resolution.prefix }}</sts:Prefix>{% endif %}
+                            <sts:From>{{ doc.resolution.from }}</sts:From>
+                            <sts:To>{{ doc.resolution.to }}</sts:To>
+                        </sts:AuthorizedInvoices>
+                    </sts:InvoiceControl>
+                    {% endif %}
+                    <sts:InvoiceSource>
+                        <cbc:IdentificationCode listAgencyID="6" listAgencyName="United Nations Economic Commission for Europe" listSchemeURI="urn:oasis:names:specification:ubl:codelist:gc:CountryIdentificationCode-2.1">CO</cbc:IdentificationCode>
+                    </sts:InvoiceSource>
+                    <sts:SoftwareProvider>
+                        <sts:ProviderID schemeAgencyID="195" schemeAgencyName="CO, DIAN (Dirección de Impuestos y Aduanas Nacionales)" schemeID="{{ providerDv }}" schemeName="31">{{ providerNit }}</sts:ProviderID>
+                        <sts:SoftwareID schemeAgencyID="195" schemeAgencyName="CO, DIAN (Dirección de Impuestos y Aduanas Nacionales)">{{ doc.software ? doc.software.id }}</sts:SoftwareID>
+                    </sts:SoftwareProvider>
+                    <sts:SoftwareSecurityCode schemeAgencyID="195" schemeAgencyName="CO, DIAN (Dirección de Impuestos y Aduanas Nacionales)">{{ doc.software ? doc.software.getSecurityCode(doc.prefijo ~ doc.numero) }}</sts:SoftwareSecurityCode>
+                    <sts:AuthorizationProvider>
+                        <sts:AuthorizationProviderID schemeAgencyID="195" schemeAgencyName="CO, DIAN (Dirección de Impuestos y Aduanas Nacionales)" schemeID="4" schemeName="31">800197268</sts:AuthorizationProviderID>
+                    </sts:AuthorizationProvider>
+                    <sts:QRCode>{{ qrCode }}</sts:QRCode>
+                </sts:DianExtensions>
+            </ext:ExtensionContent>
+        </ext:UBLExtension>
+        <ext:UBLExtension>
+            <ext:ExtensionContent/>
+        </ext:UBLExtension>
+    </ext:UBLExtensions>

@@ -1,0 +1,24 @@
+{#- params: c (Company), tag, corporatePrefix -#}
+
+{% include '@dian/party.xml.twig' with {
+    tag: tag,
+    accountId: c.tipoOrganizacion,
+    idNumber: c.nit,
+    idType: c.tipoDocumento ?: '31',
+    dv: c.nitDv,
+    name: c.razonSocial,
+    commercialName: c.commercialName,
+    address: c.address,
+    taxLevelCode: c.responsabilidades,
+    taxLevelList: c.taxLevelCode ?: c.regimen,
+    taxSchemeId: c.taxSchemeId,
+    taxSchemeName: c.taxSchemeName,
+    ciiu: c.industryClassificationCode,
+    corporatePrefix: corporatePrefix ?? null,
+    corporateName: c.matriculaMercantil,
+    contact: {
+        name: c.contact ? c.contact.name,
+        telephone: c.contact ? c.contact.telephone,
+        email: c.contact ? c.contact.electronicMail,
+    },
+} only %}

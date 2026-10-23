@@ -1,0 +1,10 @@
+{#- params: ac, currency -#}
+<cac:AllowanceCharge>
+        <cbc:ID>{{ ac.id }}</cbc:ID>
+        <cbc:ChargeIndicator>{{ ac.isCharge ? 'true' : 'false' }}</cbc:ChargeIndicator>
+        {% if ac.reasonCode %}<cbc:AllowanceChargeReasonCode>{{ ac.reasonCode }}</cbc:AllowanceChargeReasonCode>{% endif %}
+        {% if ac.reason %}<cbc:AllowanceChargeReason>{{ ac.reason }}</cbc:AllowanceChargeReason>{% endif %}
+        {% if ac.multiplierFactorNumeric > 0 %}<cbc:MultiplierFactorNumeric>{{ ac.multiplierFactorNumeric|money }}</cbc:MultiplierFactorNumeric>{% endif %}
+        <cbc:Amount currencyID="{{ currency }}">{{ ac.amount|money }}</cbc:Amount>
+        <cbc:BaseAmount currencyID="{{ currency }}">{{ ac.baseAmount|money }}</cbc:BaseAmount>
+    </cac:AllowanceCharge>

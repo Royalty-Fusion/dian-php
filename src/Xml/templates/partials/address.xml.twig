@@ -1,0 +1,15 @@
+{#- params: address, tag ('cac:Address' | 'cac:RegistrationAddress') -#}
+<{{ tag }}>
+                    {% if address.cityCode %}<cbc:ID>{{ address.cityCode }}</cbc:ID>{% endif %}
+                    {% if address.cityName %}<cbc:CityName>{{ address.cityName }}</cbc:CityName>{% endif %}
+                    {% if address.postalZone %}<cbc:PostalZone>{{ address.postalZone }}</cbc:PostalZone>{% endif %}
+                    {% if address.departmentName %}<cbc:CountrySubentity>{{ address.departmentName }}</cbc:CountrySubentity>{% endif %}
+                    {% if address.departmentCode %}<cbc:CountrySubentityCode>{{ address.departmentCode }}</cbc:CountrySubentityCode>{% endif %}
+                    <cac:AddressLine>
+                        <cbc:Line>{{ address.line }}</cbc:Line>
+                    </cac:AddressLine>
+                    <cac:Country>
+                        <cbc:IdentificationCode>{{ address.countryCode }}</cbc:IdentificationCode>
+                        <cbc:Name languageID="es">{{ address.countryName }}</cbc:Name>
+                    </cac:Country>
+                </{{ tag }}>

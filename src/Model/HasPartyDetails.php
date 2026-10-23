@@ -70,4 +70,35 @@ trait HasPartyDetails
     {
         return $this->taxLevelCode;
     }
+
+    private ?string $taxSchemeId   = null;
+    private ?string $taxSchemeName = null;
+
+    /**
+     * Tributo de la parte (cac:PartyTaxScheme/cac:TaxScheme): 01 IVA, 04 INC,
+     * ZA IVA e INC, ZZ No aplica. Defaults to 01/IVA, or ZZ/No aplica when the
+     * party is "R-99-PN" (no responsable).
+     */
+    public function setTaxScheme(string $id, string $name): self
+    {
+        $this->taxSchemeId   = $id;
+        $this->taxSchemeName = $name;
+        return $this;
+    }
+
+    public function getTaxSchemeId(): string
+    {
+        if ($this->taxSchemeId !== null) {
+            return $this->taxSchemeId;
+        }
+        return trim($this->getResponsabilidades()) === 'R-99-PN' && $this instanceof Client ? 'ZZ' : '01';
+    }
+
+    public function getTaxSchemeName(): string
+    {
+        if ($this->taxSchemeName !== null) {
+            return $this->taxSchemeName;
+        }
+        return $this->getTaxSchemeId() === 'ZZ' ? 'No aplica' : 'IVA';
+    }
 }

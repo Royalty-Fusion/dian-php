@@ -159,4 +159,21 @@ class Item
     {
         return $this->note;
     }
+
+    private float $referencePrice = 0.0;
+
+    /**
+     * Precio de referencia for free-of-charge lines (precio = 0). DIAN requires
+     * cac:PricingReference with the commercial value of the gift.
+     */
+    public function setReferencePrice(float $referencePrice): self
+    {
+        $this->referencePrice = $referencePrice;
+        return $this;
+    }
+
+    public function getReferencePrice(): float
+    {
+        return $this->referencePrice;
+    }
 }

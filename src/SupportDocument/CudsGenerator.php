@@ -4,23 +4,23 @@ declare(strict_types=1);
 
 namespace RoyaltyFusion\DianPhp\SupportDocument;
 
+use RoyaltyFusion\DianPhp\Xml\DocumentCalculator;
+
 /**
- * Generator for the CUDS hash (Código Único Documento Soporte).
+ * CUDS — Código Único del Documento Soporte (and of its nota de ajuste).
  *
- * Anexo Técnico Documento Soporte v1.2 §10:
+ * Anexo Técnico Documento Soporte (Resolución 000167 de 2021):
  *
- *   CUDS = SHA-384(
- *     NumDS + FecDS + HoraDS + ValDS +
- *     CodImp1 + ValImp1 +
- *     CodImp2 + ValImp2 +
- *     CodImp3 + ValImp3 +
- *     ValTot +
- *     NitOFE + NumAdq + TipoAmb + PinSoftware
- *   )
+ *   CUDS = SHA-384(NumDS + FecDS + HorDS + ValDS + CodImp + ValImp + ValTol
+ *                  + NumSNO + NITABS + SoftwarePIN + TipoAmbiente)
  *
- * Note: the acquirente (your company) is the *issuer* of the DS.
- * "OFE" here means the obligado a facturar emitiendo el DS — i.e. you.
- * "Adq" is the seller (un no obligado a facturar).
+ *   ValDS  = LineExtensionAmount
+ *   CodImp = 01 (IVA), ValImp = total IVA
+ *   ValTol = PayableAmount
+ *   NumSNO = documento del vendedor no obligado (AccountingSupplierParty)
+ *   NITABS = NIT del adquiriente que emite el DS (AccountingCustomerParty)
+ *
+ * Amounts come from {@see DocumentCalculator}, the same values written in the XML.
  */
 final class CudsGenerator
 {
@@ -29,40 +29,23 @@ final class CudsGenerator
 
     public function generate(SupportDocument $doc, string $pinSoftware, string $environment = self::ENV_HABILITACION): string
     {
-        $numDoc  = $doc->getPrefijo() . $doc->getNumero();
-        $fecDoc  = $doc->getFecha() ? $doc->getFecha()->format('Y-m-d') : date('Y-m-d');
-        $horaDoc = $doc->getFecha() ? $doc->getFecha()->format('H:i:sP') : date('H:i:sP');
+        return hash('sha384', $this->buildString($doc, $pinSoftware, $environment));
+    }
 
-        $valDoc = 0.0;
-        foreach ($doc->getItems() as $item) {
-            $valDoc += ($item->getCantidad() * $item->getPrecio());
-        }
-        $valDocStr = number_format($valDoc, 2, '.', '');
+    public function buildString(SupportDocument $doc, string $pinSoftware, string $environment = self::ENV_HABILITACION): string
+    {
+        $totals = DocumentCalculator::totals($doc);
+        $f      = static fn (float $v): string => number_format($v, 2, '.', '');
 
-        // Same three tax slots as CUFE/CUDE — IVA, INC, ICA
-        $valImp1 = 0.0; // 01 = IVA
-        $valImp2 = 0.0; // 04 = INC
-        $valImp3 = 0.0; // 03 = ICA
-        foreach ($doc->getTaxes() as $tax) {
-            if ($tax->getCode() === '01') {
-                $valImp1 += $tax->getAmount();
-            } elseif ($tax->getCode() === '04') {
-                $valImp2 += $tax->getAmount();
-            } elseif ($tax->getCode() === '03') {
-                $valImp3 += $tax->getAmount();
-            }
-        }
-
-        $valTotStr = number_format($doc->getTotal(), 2, '.', '');
-        $nitOfe    = $doc->getCompany()  ? $doc->getCompany()->getNit()           : '';
-        $numAdq    = $doc->getSupplier() ? $doc->getSupplier()->getNumeroDocumento() : '';
-
-        $base = $numDoc . $fecDoc . $horaDoc . $valDocStr
-            . '01' . number_format($valImp1, 2, '.', '')
-            . '04' . number_format($valImp2, 2, '.', '')
-            . '03' . number_format($valImp3, 2, '.', '')
-            . $valTotStr . $nitOfe . $numAdq . $environment . $pinSoftware;
-
-        return hash('sha384', $base);
+        return $doc->getPrefijo() . $doc->getNumero()
+            . $totals['issueDate']
+            . $totals['issueTime']
+            . $f($totals['lineExtensionAmount'])
+            . '01' . $f($totals['taxTotalsByCode']['01'] ?? 0.0)
+            . $f($totals['payableAmount'])
+            . ($doc->getSupplier()?->getNumeroDocumento() ?? '')
+            . ($doc->getCompany()?->getNit() ?? '')
+            . $pinSoftware
+            . $environment;
     }
 }

@@ -8,14 +8,15 @@ use RoyaltyFusion\DianPhp\Catalog\TipoAmbiente;
 use RoyaltyFusion\DianPhp\Model\CreditNote;
 use RoyaltyFusion\DianPhp\Model\DebitNote;
 use RoyaltyFusion\DianPhp\Model\Invoice;
+use RoyaltyFusion\DianPhp\Model\NitDvCalculator;
 use Twig\Environment;
-use Twig\Loader\FilesystemLoader;
 
 /**
- * Renderer of DIAN UBL 2.1 XML documents from Twig templates.
+ * Renderer of DIAN UBL 2.1 XML documents (Factura, Nota Crédito, Nota Débito).
  *
- * Greenter-style: this class only orchestrates the template render —
- * business arithmetic is delegated to {@see DocumentCalculator}.
+ * Every amount comes from {@see DocumentCalculator}; templates live in
+ * src/Xml/templates and share the partials under templates/partials.
+ * Values are XML-escaped automatically (see {@see TwigFactory}).
  */
 class XmlBuilder
 {
@@ -24,55 +25,48 @@ class XmlBuilder
     private string $uuidSchemeId;
 
     /**
-     * @param  string  $uuidSchemeId  '1' (matches Siigo and most production
-     *                                facturadores) or '2' (post-Anexo V1.9
-     *                                hashing scheme). Default '1' since that
-     *                                is what real-world DIAN traffic uses.
+     * @param  string  $environment   TipoAmbiente value: '1' producción, '2' habilitación.
+     * @param  string  $uuidSchemeId  cbc:UUID@schemeID — DIAN expects the ambiente
+     *                                code; null keeps it equal to $environment.
      */
     public function __construct(
         ?Environment $twig = null,
         string $environment = TipoAmbiente::HABILITACION->value,
-        string $uuidSchemeId = '1'
+        ?string $uuidSchemeId = null
     ) {
-        if ($twig instanceof Environment) {
-            $this->twig = $twig;
-        } else {
-            $loader = new FilesystemLoader(__DIR__ . '/templates');
-            $this->twig = new Environment($loader, [
-                'autoescape'       => false,
-                'strict_variables' => false,
-            ]);
-        }
+        $this->twig         = $twig ?? TwigFactory::create(__DIR__ . '/templates');
         $this->environment  = $environment;
-        $this->uuidSchemeId = $uuidSchemeId;
+        $this->uuidSchemeId = $uuidSchemeId ?? $environment;
     }
 
     /**
-     * Builds the complete UBL 2.1 XML for DIAN (Anexo V1.9) using Twig templates.
+     * @param string $qrCode Full sts:QRCode text ({@see QrGenerator::content()}) or just the URL.
      */
-    public function build(Invoice|CreditNote|DebitNote $document, string $uuid, string $qrCodeUrl): string
+    public function build(Invoice|CreditNote|DebitNote $document, string $uuid, string $qrCode): string
     {
-        $totals = DocumentCalculator::totals($document);
+        $template = match (true) {
+            $document instanceof Invoice    => 'invoice.xml.twig',
+            $document instanceof CreditNote => 'creditnote.xml.twig',
+            default                         => 'debitnote.xml.twig',
+        };
 
-        if ($document instanceof Invoice) {
-            $template = 'invoice.xml.twig';
-            $idKey    = 'cufe';
-        } elseif ($document instanceof CreditNote) {
-            $template = 'creditnote.xml.twig';
-            $idKey    = 'cude';
-        } else {
-            $template = 'debitnote.xml.twig';
-            $idKey    = 'cude';
-        }
+        $providerNit = $document->getSoftware()?->getProviderNit()
+            ?: ($document->getCompany()?->getNit() ?? '');
 
         return $this->twig->render($template, [
             'doc'           => $document,
-            $idKey          => $uuid,
-            'qrCodeUrl'     => $qrCodeUrl,
-            'totals'        => $totals,
+            'uuid'          => $uuid,
+            'cufe'          => $uuid,
+            'cude'          => $uuid,
+            'qrCode'        => $qrCode,
+            'qrCodeUrl'     => $qrCode,
+            'totals'        => DocumentCalculator::totals($document),
+            'currency'      => $document->getCurrencyCode() ?: 'COP',
             'environment'   => $this->environment,
             'profileExecId' => $this->environment,
             'uuidSchemeId'  => $this->uuidSchemeId,
+            'providerNit'   => $providerNit,
+            'providerDv'    => NitDvCalculator::compute($providerNit),
         ]);
     }
 }

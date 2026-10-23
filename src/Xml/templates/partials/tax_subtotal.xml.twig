@@ -1,0 +1,12 @@
+{#- params: sub, currency -#}
+<cac:TaxSubtotal>
+            <cbc:TaxableAmount currencyID="{{ currency }}">{{ sub.base|money }}</cbc:TaxableAmount>
+            <cbc:TaxAmount currencyID="{{ currency }}">{{ sub.amount|money }}</cbc:TaxAmount>
+            <cac:TaxCategory>
+                <cbc:Percent>{{ sub.percent|money }}</cbc:Percent>
+                <cac:TaxScheme>
+                    <cbc:ID>{{ sub.code }}</cbc:ID>
+                    <cbc:Name>{{ sub.name }}</cbc:Name>
+                </cac:TaxScheme>
+            </cac:TaxCategory>
+        </cac:TaxSubtotal>

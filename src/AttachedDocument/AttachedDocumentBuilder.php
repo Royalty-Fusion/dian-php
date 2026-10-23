@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace RoyaltyFusion\DianPhp\AttachedDocument;
 
 use Twig\Environment;
-use Twig\Loader\FilesystemLoader;
+use RoyaltyFusion\DianPhp\Xml\TwigFactory;
 
 /**
  * Renders an AttachedDocument XML from a populated {@see AttachedDocument}.
@@ -19,16 +19,7 @@ class AttachedDocumentBuilder
 
     public function __construct(?Environment $twig = null)
     {
-        if ($twig instanceof Environment) {
-            $this->twig = $twig;
-            return;
-        }
-
-        $loader = new FilesystemLoader(__DIR__ . '/templates');
-        $this->twig = new Environment($loader, [
-            'autoescape'       => false,
-            'strict_variables' => false,
-        ]);
+        $this->twig = $twig ?? TwigFactory::create(__DIR__ . '/templates');
     }
 
     public function build(AttachedDocument $doc): string

@@ -1,0 +1,49 @@
+{#- Generic DIAN party. params: tag, accountId, idNumber, idType, dv (nullable),
+    name, commercialName, address, taxLevelCode, taxLevelList, taxSchemeId,
+    taxSchemeName, ciiu (nullable), corporateName (nullable), contact {name,telephone,email} -#}
+<{{ tag }}>
+        <cbc:AdditionalAccountID>{{ accountId }}</cbc:AdditionalAccountID>
+        <cac:Party>
+            {% if ciiu %}<cbc:IndustryClassificationCode>{{ ciiu }}</cbc:IndustryClassificationCode>{% endif %}
+            <cac:PartyIdentification>
+                <cbc:ID schemeAgencyID="195" schemeAgencyName="CO, DIAN (Dirección de Impuestos y Aduanas Nacionales)"{% if dv is not null %} schemeID="{{ dv }}"{% endif %} schemeName="{{ idType }}">{{ idNumber }}</cbc:ID>
+            </cac:PartyIdentification>
+            <cac:PartyName>
+                <cbc:Name>{{ commercialName ?: name }}</cbc:Name>
+            </cac:PartyName>
+            {% if address %}
+            <cac:PhysicalLocation>
+                {% include '@dian/address.xml.twig' with {address: address, tag: 'cac:Address'} only %}
+            </cac:PhysicalLocation>
+            {% endif %}
+            <cac:PartyTaxScheme>
+                <cbc:RegistrationName>{{ name }}</cbc:RegistrationName>
+                <cbc:CompanyID schemeAgencyID="195" schemeAgencyName="CO, DIAN (Dirección de Impuestos y Aduanas Nacionales)"{% if dv is not null %} schemeID="{{ dv }}"{% endif %} schemeName="{{ idType }}">{{ idNumber }}</cbc:CompanyID>
+                <cbc:TaxLevelCode{% if taxLevelList %} listName="{{ taxLevelList }}"{% endif %}>{{ taxLevelCode ?: 'R-99-PN' }}</cbc:TaxLevelCode>
+                {% if address %}
+                {% include '@dian/address.xml.twig' with {address: address, tag: 'cac:RegistrationAddress'} only %}
+                {% endif %}
+                <cac:TaxScheme>
+                    <cbc:ID>{{ taxSchemeId }}</cbc:ID>
+                    <cbc:Name>{{ taxSchemeName }}</cbc:Name>
+                </cac:TaxScheme>
+            </cac:PartyTaxScheme>
+            <cac:PartyLegalEntity>
+                <cbc:RegistrationName>{{ name }}</cbc:RegistrationName>
+                <cbc:CompanyID schemeAgencyID="195" schemeAgencyName="CO, DIAN (Dirección de Impuestos y Aduanas Nacionales)"{% if dv is not null %} schemeID="{{ dv }}"{% endif %} schemeName="{{ idType }}">{{ idNumber }}</cbc:CompanyID>
+                {% if corporatePrefix is defined and corporatePrefix is not null %}
+                <cac:CorporateRegistrationScheme>
+                    {% if corporatePrefix %}<cbc:ID>{{ corporatePrefix }}</cbc:ID>{% endif %}
+                    {% if corporateName %}<cbc:Name>{{ corporateName }}</cbc:Name>{% endif %}
+                </cac:CorporateRegistrationScheme>
+                {% endif %}
+            </cac:PartyLegalEntity>
+            {% if contact.name or contact.telephone or contact.email %}
+            <cac:Contact>
+                {% if contact.name %}<cbc:Name>{{ contact.name }}</cbc:Name>{% endif %}
+                {% if contact.telephone %}<cbc:Telephone>{{ contact.telephone }}</cbc:Telephone>{% endif %}
+                {% if contact.email %}<cbc:ElectronicMail>{{ contact.email }}</cbc:ElectronicMail>{% endif %}
+            </cac:Contact>
+            {% endif %}
+        </cac:Party>
+    </{{ tag }}>

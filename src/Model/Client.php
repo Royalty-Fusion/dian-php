@@ -92,4 +92,36 @@ class Client
     {
         return $this->tipoOrganizacion ?? '';
     }
+
+    private ?int $nitDv = null;
+    private string $commercialName = '';
+
+    public function setNitDv(int $nitDv): self
+    {
+        $this->nitDv = $nitDv;
+        return $this;
+    }
+
+    /** DV of the customer NIT (only for tipo de documento 31), null otherwise. */
+    public function getNitDv(): ?int
+    {
+        if ($this->nitDv !== null) {
+            return $this->nitDv;
+        }
+        if ($this->getTipoDocumento() !== '31') {
+            return null;
+        }
+        return NitDvCalculator::compute($this->getNumeroDocumento());
+    }
+
+    public function setCommercialName(string $commercialName): self
+    {
+        $this->commercialName = $commercialName;
+        return $this;
+    }
+
+    public function getCommercialName(): string
+    {
+        return $this->commercialName;
+    }
 }

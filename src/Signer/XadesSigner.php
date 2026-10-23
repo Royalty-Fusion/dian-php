@@ -4,239 +4,313 @@ declare(strict_types=1);
 
 namespace RoyaltyFusion\DianPhp\Signer;
 
-use RobRichards\XMLSecLibs\XMLSecurityDSig;
-use RobRichards\XMLSecLibs\XMLSecurityKey;
-
 /**
- * XAdES-EPES signer compliant with DIAN Anexo Técnico V1.9.
+ * XAdES-EPES enveloped signer compliant with DIAN Anexo Técnico V1.9 and the
+ * official signature policy v2.
  *
- * Signature flow:
- *   1. Load PKCS#12 certificate from disk.
- *   2. Build the XAdES Object (QualifyingProperties → SignedProperties).
- *   3. Add the enveloped signature reference plus the SignedProperties reference.
- *   4. Sign with RSA-SHA256 and inject the resulting ds:Signature inside the
- *      second ext:ExtensionContent placeholder of the UBL document.
+ * Produces the exact structure found in DIAN-approved production documents
+ * (see resources/fixtures): one ds:Signature placed in the last empty
+ * ext:ExtensionContent, with three references —
+ *   1. URI=""               the whole document (enveloped-signature transform)
+ *   2. URI="#…-keyinfo"     ds:KeyInfo
+ *   3. URI="#…-signedprops" xades:SignedProperties
+ * — inclusive C14N, RSA-SHA256 and SHA-256 digests.
  *
- * NOTE: Phase 1 of the roadmap will further harden canonicalization rules
- * and KeyInfo handling against the latest DIAN reference XAdES samples.
+ * The signer is verified in the test-suite with {@see SignatureVerifier},
+ * which in turn is verified against real DIAN-approved signatures.
  */
 class XadesSigner
 {
     /** Official DIAN signature policy v2 */
     public const POLICY_URL          = 'https://facturaelectronica.dian.gov.co/politicadefirma/v2/politicadefirmav2.pdf';
-    public const POLICY_HASH_SHA256  = 'dMoQAOR5HscatV9QLJ864wS6u2bM=';
+    public const POLICY_HASH_SHA256  = 'dMoMvtcG5aIzgYo0tIsSQeVJBDnUnfSOfBpxXrmor0Y=';
     public const POLICY_DESCRIPTION  = 'Política de firma para facturas electrónicas de la República de Colombia';
 
     public const ROLE_SUPPLIER    = 'supplier';
     public const ROLE_THIRD_PARTY = 'third party';
     public const ROLE_CUSTOMER    = 'customer';
 
-    private string $certPath;
-    private string $password;
+    private const NS_DS    = 'http://www.w3.org/2000/09/xmldsig#';
+    private const NS_XADES = 'http://uri.etsi.org/01903/v1.3.2#';
+    private const NS_EXT   = 'urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2';
+
+    private const C14N      = 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315';
+    private const RSA_SHA256 = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
+    private const SHA256    = 'http://www.w3.org/2001/04/xmlenc#sha256';
+    private const ENVELOPED = 'http://www.w3.org/2000/09/xmldsig#enveloped-signature';
+
+    private ?Certificate $certificate = null;
+    private ?string $certPath;
+    private ?string $password;
     private ?string $signerRole;
+    private ?\DateTimeInterface $fixedSigningTime = null;
 
     /**
-     * @param  string|null  $signerRole  When non-null, emits a
-     *  <xades:SignerRole><xades:ClaimedRoles> block. Use ROLE_THIRD_PARTY when
-     *  signing on behalf of the issuer (typical for facturadores tecnológicos
-     *  like Siigo), ROLE_SUPPLIER when the issuer signs with its own cert.
+     * @param  string|null  $signerRole  Emits <xades:SignerRole>. Use ROLE_SUPPLIER when the
+     *  issuer signs with its own certificate (default) or ROLE_THIRD_PARTY when a
+     *  proveedor tecnológico signs on behalf of the issuer. Null omits the block.
      */
-    public function __construct(string $certPath, string $password, ?string $signerRole = null)
+    public function __construct(?string $certPath = null, ?string $password = null, ?string $signerRole = self::ROLE_SUPPLIER)
     {
         $this->certPath   = $certPath;
         $this->password   = $password;
         $this->signerRole = $signerRole;
     }
 
+    public static function fromCertificate(Certificate $certificate, ?string $signerRole = self::ROLE_SUPPLIER): self
+    {
+        $signer = new self(null, null, $signerRole);
+        $signer->certificate = $certificate;
+
+        return $signer;
+    }
+
+    /** Freezes xades:SigningTime — only meant for reproducible tests. */
+    public function setSigningTime(?\DateTimeInterface $time): self
+    {
+        $this->fixedSigningTime = $time;
+        return $this;
+    }
+
+    public function getCertificate(): Certificate
+    {
+        if ($this->certificate === null) {
+            if ($this->certPath === null) {
+                throw new \RuntimeException('No se configuró un certificado para firmar.');
+            }
+            $this->certificate = Certificate::fromPkcs12File($this->certPath, (string) $this->password);
+        }
+
+        return $this->certificate;
+    }
+
     /**
-     * @throws \RuntimeException when the certificate cannot be loaded.
+     * Signs a UBL document and returns the signed XML.
+     *
+     * @throws \RuntimeException when the XML is malformed, has no signature slot
+     *                           or the certificate cannot be used.
      */
     public function sign(string $xml): string
     {
-        if (!file_exists($this->certPath)) {
-            throw new \RuntimeException('Certificate file not found: ' . $this->certPath);
-        }
+        $cert = $this->getCertificate();
 
-        $pkcs12 = file_get_contents($this->certPath);
-        if ($pkcs12 === false) {
-            throw new \RuntimeException('Unable to read certificate file.');
-        }
-
-        $certs = [];
-        if (!openssl_pkcs12_read($pkcs12, $certs, $this->password)) {
-            throw new \RuntimeException('Could not read the certificate. Check password or format.');
-        }
-
-        $privateKey = $certs['pkey'];
-        $publicKey  = $certs['cert'];
-
-        $certData = openssl_x509_parse($publicKey);
-        if (!$certData) {
-            throw new \RuntimeException('Failed to parse public certificate.');
-        }
-
-        // Issuer DN string
-        $issuerParts = [];
-        foreach ($certData['issuer'] as $key => $value) {
-            if (is_array($value)) {
-                $value = implode(',', $value);
-            }
-            $issuerParts[] = "$key=$value";
-        }
-        $issuerName   = implode(', ', $issuerParts);
-        $serialNumber = $certData['serialNumber'];
-
-        // SHA-256 digest of the DER-encoded certificate
-        $cleanCert  = str_replace(
-            ['-----BEGIN CERTIFICATE-----', '-----END CERTIFICATE-----', "\r", "\n", ' '],
-            '',
-            $publicKey
-        );
-        $certBinary = base64_decode($cleanCert);
-        $certDigest = base64_encode(hash('sha256', $certBinary, true));
-
-        $dom = new \DOMDocument();
+        $dom = new \DOMDocument('1.0', 'UTF-8');
         $dom->preserveWhiteSpace = true;
-        $dom->loadXML($xml);
-
-        $sigId            = 'xmldsig-signature-id';
-        $signedPropsId    = 'xmldsig-signedproperties-id';
-        $keyInfoId        = 'xmldsig-keyinfo-id';
-
-        $objDSig = new XMLSecurityDSig();
-        $objDSig->setCanonicalMethod(XMLSecurityDSig::C14N);
-
-        // Reference 1: enveloped document
-        $objDSig->addReference(
-            $dom,
-            XMLSecurityDSig::SHA256,
-            ['http://www.w3.org/2000/09/xmldsig#enveloped-signature'],
-            ['force_uri' => true]
-        );
-
-        $sigNode = $objDSig->createNewSignNode();
-        $sigNode->setAttribute('Id', $sigId);
-
-        // XAdES SignedProperties scaffolding
-        $objectNode    = $dom->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:Object');
-        $qualProps     = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:QualifyingProperties');
-        $qualProps->setAttribute('Target', '#' . $sigId);
-
-        $signedProps   = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:SignedProperties');
-        $signedProps->setAttribute('Id', $signedPropsId);
-
-        $signedSigProps = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:SignedSignatureProperties');
-
-        $signingTime = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:SigningTime', date('c'));
-        $signedSigProps->appendChild($signingTime);
-
-        // SigningCertificate
-        $signingCertificate = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:SigningCertificate');
-        $certNode           = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:Cert');
-
-        $certDigestNode = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:CertDigest');
-        $digestMethod   = $dom->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:DigestMethod');
-        $digestMethod->setAttribute('Algorithm', 'http://www.w3.org/2001/04/xmlenc#sha256');
-        $certDigestNode->appendChild($digestMethod);
-        $certDigestNode->appendChild($dom->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:DigestValue', $certDigest));
-        $certNode->appendChild($certDigestNode);
-
-        $issuerSerial = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:IssuerSerial');
-        $issuerSerial->appendChild($dom->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:X509IssuerName', $issuerName));
-        $issuerSerial->appendChild($dom->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:X509SerialNumber', $serialNumber));
-        $certNode->appendChild($issuerSerial);
-
-        $signingCertificate->appendChild($certNode);
-        $signedSigProps->appendChild($signingCertificate);
-
-        // SignaturePolicyIdentifier
-        $sigPolicyId       = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:SignaturePolicyIdentifier');
-        $sigPolicyIdNode   = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:SignaturePolicyId');
-        $sigPolicyDetails  = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:SigPolicyId');
-        $sigPolicyDetails->appendChild($dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:Identifier', self::POLICY_URL));
-        $sigPolicyDetails->appendChild($dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:Description', self::POLICY_DESCRIPTION));
-        $sigPolicyIdNode->appendChild($sigPolicyDetails);
-
-        $sigPolicyHash = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:SigPolicyHash');
-        $policyDigest  = $dom->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:DigestMethod');
-        $policyDigest->setAttribute('Algorithm', 'http://www.w3.org/2001/04/xmlenc#sha256');
-        $sigPolicyHash->appendChild($policyDigest);
-        $sigPolicyHash->appendChild($dom->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:DigestValue', self::POLICY_HASH_SHA256));
-        $sigPolicyIdNode->appendChild($sigPolicyHash);
-
-        $sigPolicyId->appendChild($sigPolicyIdNode);
-        $signedSigProps->appendChild($sigPolicyId);
-
-        // Optional SignerRole — recommended for third-party facturadores tecnológicos
-        if ($this->signerRole !== null) {
-            $signerRole   = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:SignerRole');
-            $claimedRoles = $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:ClaimedRoles');
-            $claimedRoles->appendChild(
-                $dom->createElementNS('http://uri.etsi.org/01903/v1.3.2#', 'xades:ClaimedRole', $this->signerRole)
+        $dom->formatOutput       = false;
+        libxml_use_internal_errors(true);
+        $loaded = $dom->loadXML($xml);
+        $errors = libxml_get_errors();
+        libxml_clear_errors();
+        libxml_use_internal_errors(false);
+        if (!$loaded) {
+            $first = $errors[0] ?? null;
+            throw new \RuntimeException(
+                'El XML a firmar no está bien formado'
+                . ($first ? sprintf(' (línea %d: %s)', $first->line, trim($first->message)) : '')
             );
-            $signerRole->appendChild($claimedRoles);
-            $signedSigProps->appendChild($signerRole);
         }
 
-        $signedProps->appendChild($signedSigProps);
-        $qualProps->appendChild($signedProps);
-        $objectNode->appendChild($qualProps);
-        $sigNode->appendChild($objectNode);
+        $target = $this->findSignatureSlot($dom);
 
-        // RSA-SHA256 key
-        $objKey = new XMLSecurityKey(XMLSecurityKey::RSA_SHA256, ['type' => 'private']);
-        $objKey->loadKey($privateKey, false);
+        // 1) Digest of the document before the signature exists — identical to
+        //    applying the enveloped-signature transform afterwards.
+        $docDigest = $this->digest((string) $dom->C14N(false, false));
 
-        // Reference 2: SignedProperties
-        $objDSig->addReference(
-            $sigNode,
-            XMLSecurityDSig::SHA256,
-            null,
-            [
-                'type'      => 'http://uri.etsi.org/01903#SignedProperties',
-                'id_name'   => 'Id',
-                'overwrite' => false,
-            ]
-        );
+        $uid           = self::uuid();
+        $sigId         = "xmldsig-{$uid}";
+        $refDocId      = "{$sigId}-ref0";
+        $keyInfoId     = "{$sigId}-keyinfo";
+        $signedPropsId = "{$sigId}-signedprops";
 
-        $objDSig->sign($objKey);
-        $objDSig->add509Cert($publicKey, true, false, ['issuerSerial' => true, 'subjectName' => true]);
+        $signature = $dom->createElementNS(self::NS_DS, 'ds:Signature');
+        $signature->setAttribute('Id', $sigId);
+        $target->appendChild($signature);
 
-        // Set ID on KeyInfo using the proper XMLDSig namespace
-        $keyInfoNode = $sigNode->getElementsByTagNameNS('http://www.w3.org/2000/09/xmldsig#', 'KeyInfo')->item(0);
-        if ($keyInfoNode instanceof \DOMElement) {
-            $keyInfoNode->setAttribute('Id', $keyInfoId);
+        $signedInfo = $this->ds($dom, 'SignedInfo');
+        $signature->appendChild($signedInfo);
+        $signedInfo->appendChild($this->ds($dom, 'CanonicalizationMethod', null, ['Algorithm' => self::C14N]));
+        $signedInfo->appendChild($this->ds($dom, 'SignatureMethod', null, ['Algorithm' => self::RSA_SHA256]));
+
+        $refDoc = $this->reference($dom, '', $docDigest, ['Id' => $refDocId], true);
+        $signedInfo->appendChild($refDoc);
+        $refKeyInfo = $this->reference($dom, '#' . $keyInfoId, '');
+        $signedInfo->appendChild($refKeyInfo);
+        $refProps = $this->reference($dom, '#' . $signedPropsId, '', ['Type' => 'http://uri.etsi.org/01903#SignedProperties']);
+        $signedInfo->appendChild($refProps);
+
+        $signatureValue = $this->ds($dom, 'SignatureValue', null, ['Id' => "{$sigId}-sigvalue"]);
+        $signature->appendChild($signatureValue);
+
+        $keyInfo = $this->ds($dom, 'KeyInfo', null, ['Id' => $keyInfoId]);
+        $x509    = $this->ds($dom, 'X509Data');
+        $x509->appendChild($this->ds($dom, 'X509Certificate', $cert->getCertificateBase64()));
+        $keyInfo->appendChild($x509);
+        $signature->appendChild($keyInfo);
+
+        $object = $this->ds($dom, 'Object');
+        $signature->appendChild($object);
+        $qualifying = $this->xades($dom, 'QualifyingProperties', null, ['Target' => '#' . $sigId]);
+        $object->appendChild($qualifying);
+        $signedProps = $this->xades($dom, 'SignedProperties', null, ['Id' => $signedPropsId]);
+        $qualifying->appendChild($signedProps);
+        $signedProps->appendChild($this->signedSignatureProperties($dom, $cert));
+
+        $dataObj = $this->xades($dom, 'SignedDataObjectProperties');
+        $format  = $this->xades($dom, 'DataObjectFormat', null, ['ObjectReference' => '#' . $refDocId]);
+        $format->appendChild($this->xades($dom, 'MimeType', 'text/xml'));
+        $format->appendChild($this->xades($dom, 'Encoding', 'UTF-8'));
+        $dataObj->appendChild($format);
+        $signedProps->appendChild($dataObj);
+
+        // 2) Digests of KeyInfo and SignedProperties, computed in their final
+        //    position so inherited namespaces are part of the canonical form.
+        $this->setDigest($refKeyInfo, $this->digest((string) $keyInfo->C14N(false, false)));
+        $this->setDigest($refProps, $this->digest((string) $signedProps->C14N(false, false)));
+
+        // 3) Sign the canonical SignedInfo.
+        $raw = '';
+        if (!openssl_sign((string) $signedInfo->C14N(false, false), $raw, $cert->getPrivateKeyPem(), OPENSSL_ALGO_SHA256)) {
+            throw new \RuntimeException('OpenSSL no pudo firmar el documento: ' . (openssl_error_string() ?: 'error desconocido'));
+        }
+        $signatureValue->appendChild($dom->createTextNode(base64_encode($raw)));
+
+        return (string) $dom->saveXML();
+    }
+
+    private function signedSignatureProperties(\DOMDocument $dom, Certificate $cert): \DOMElement
+    {
+        $props = $this->xades($dom, 'SignedSignatureProperties');
+
+        $time = $this->fixedSigningTime
+            ?? new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota'));
+        $props->appendChild($this->xades($dom, 'SigningTime', $time->format('Y-m-d\TH:i:sP')));
+
+        $signingCert = $this->xades($dom, 'SigningCertificate');
+        $certNode    = $this->xades($dom, 'Cert');
+        $certDigest  = $this->xades($dom, 'CertDigest');
+        $certDigest->appendChild($this->ds($dom, 'DigestMethod', null, ['Algorithm' => self::SHA256]));
+        $certDigest->appendChild($this->ds($dom, 'DigestValue', $cert->getDigest()));
+        $certNode->appendChild($certDigest);
+        $issuerSerial = $this->xades($dom, 'IssuerSerial');
+        $issuerSerial->appendChild($this->ds($dom, 'X509IssuerName', $cert->getIssuerName()));
+        $issuerSerial->appendChild($this->ds($dom, 'X509SerialNumber', $cert->getSerialNumber()));
+        $certNode->appendChild($issuerSerial);
+        $signingCert->appendChild($certNode);
+        $props->appendChild($signingCert);
+
+        $policy   = $this->xades($dom, 'SignaturePolicyIdentifier');
+        $policyId = $this->xades($dom, 'SignaturePolicyId');
+        $sigPolicyId = $this->xades($dom, 'SigPolicyId');
+        $sigPolicyId->appendChild($this->xades($dom, 'Identifier', self::POLICY_URL));
+        $sigPolicyId->appendChild($this->xades($dom, 'Description', self::POLICY_DESCRIPTION));
+        $policyId->appendChild($sigPolicyId);
+        $policyHash = $this->xades($dom, 'SigPolicyHash');
+        $policyHash->appendChild($this->ds($dom, 'DigestMethod', null, ['Algorithm' => self::SHA256]));
+        $policyHash->appendChild($this->ds($dom, 'DigestValue', self::POLICY_HASH_SHA256));
+        $policyId->appendChild($policyHash);
+        $policy->appendChild($policyId);
+        $props->appendChild($policy);
+
+        if ($this->signerRole !== null) {
+            $role    = $this->xades($dom, 'SignerRole');
+            $claimed = $this->xades($dom, 'ClaimedRoles');
+            $claimed->appendChild($this->xades($dom, 'ClaimedRole', $this->signerRole));
+            $role->appendChild($claimed);
+            $props->appendChild($role);
         }
 
-        // Pick the last EMPTY <ext:ExtensionContent> walking from the end.
-        // DIAN documents use two conventions:
-        //   * Invoice / CreditNote / DebitNote / DocumentSupport
-        //       -> 2 UBLExtensions (DIAN extension #0 + empty signature slot #1)
-        //   * AttachedDocument / ApplicationResponse
-        //       -> 1 UBLExtension (empty signature slot at #0)
-        $extNodes = $dom->getElementsByTagNameNS(
-            'urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2',
-            'ExtensionContent'
-        );
+        return $props;
+    }
 
-        $target = null;
-        for ($i = $extNodes->length - 1; $i >= 0; $i--) {
-            $candidate = $extNodes->item($i);
-            if ($candidate instanceof \DOMElement && trim($candidate->textContent) === '') {
-                $target = $candidate;
-                break;
+    /**
+     * DIAN documents carry the signature in the last empty ext:ExtensionContent:
+     * the 2nd one for Invoice/CreditNote/DebitNote/DS/Nómina, the only one for
+     * AttachedDocument/ApplicationResponse.
+     */
+    private function findSignatureSlot(\DOMDocument $dom): \DOMElement
+    {
+        $nodes = $dom->getElementsByTagNameNS(self::NS_EXT, 'ExtensionContent');
+        for ($i = $nodes->length - 1; $i >= 0; $i--) {
+            $candidate = $nodes->item($i);
+            if ($candidate instanceof \DOMElement
+                && trim($candidate->textContent) === ''
+                && $candidate->getElementsByTagName('*')->length === 0) {
+                // Drop whitespace-only text so the slot stays byte-identical after
+                // the enveloped transform removes the signature.
+                while ($candidate->firstChild !== null) {
+                    $candidate->removeChild($candidate->firstChild);
+                }
+                return $candidate;
             }
         }
-        if ($target === null && $extNodes->length > 0) {
-            $target = $extNodes->item($extNodes->length - 1);
+
+        throw new \RuntimeException(
+            'El documento no tiene un <ext:ExtensionContent/> vacío donde insertar la firma.'
+        );
+    }
+
+    /** @param array<string,string> $attrs */
+    private function reference(\DOMDocument $dom, string $uri, string $digest, array $attrs = [], bool $enveloped = false): \DOMElement
+    {
+        $ref = $this->ds($dom, 'Reference', null, $attrs + ['URI' => $uri]);
+        if ($enveloped) {
+            $transforms = $this->ds($dom, 'Transforms');
+            $transforms->appendChild($this->ds($dom, 'Transform', null, ['Algorithm' => self::ENVELOPED]));
+            $ref->appendChild($transforms);
+        }
+        $ref->appendChild($this->ds($dom, 'DigestMethod', null, ['Algorithm' => self::SHA256]));
+        $ref->appendChild($this->ds($dom, 'DigestValue', $digest));
+
+        return $ref;
+    }
+
+    private function setDigest(\DOMElement $reference, string $digest): void
+    {
+        foreach ($reference->childNodes as $child) {
+            if ($child instanceof \DOMElement && $child->localName === 'DigestValue') {
+                $child->appendChild($child->ownerDocument->createTextNode($digest));
+                return;
+            }
+        }
+    }
+
+    private function digest(string $canonical): string
+    {
+        return base64_encode(hash('sha256', $canonical, true));
+    }
+
+    /** @param array<string,string> $attrs */
+    private function ds(\DOMDocument $dom, string $name, ?string $text = null, array $attrs = []): \DOMElement
+    {
+        return $this->element($dom, self::NS_DS, 'ds:' . $name, $text, $attrs);
+    }
+
+    /** @param array<string,string> $attrs */
+    private function xades(\DOMDocument $dom, string $name, ?string $text = null, array $attrs = []): \DOMElement
+    {
+        return $this->element($dom, self::NS_XADES, 'xades:' . $name, $text, $attrs);
+    }
+
+    /** @param array<string,string> $attrs */
+    private function element(\DOMDocument $dom, string $ns, string $qName, ?string $text, array $attrs): \DOMElement
+    {
+        $el = $dom->createElementNS($ns, $qName);
+        foreach ($attrs as $k => $v) {
+            $el->setAttribute($k, $v);
+        }
+        if ($text !== null && $text !== '') {
+            $el->appendChild($dom->createTextNode($text));
         }
 
-        if ($target instanceof \DOMElement) {
-            $target->appendChild($dom->importNode($sigNode, true));
-        } else {
-            $dom->documentElement->appendChild($dom->importNode($sigNode, true));
-        }
+        return $el;
+    }
 
-        return $dom->saveXML();
+    private static function uuid(): string
+    {
+        $b    = random_bytes(16);
+        $b[6] = chr((ord($b[6]) & 0x0f) | 0x40);
+        $b[8] = chr((ord($b[8]) & 0x3f) | 0x80);
+
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($b), 4));
     }
 }

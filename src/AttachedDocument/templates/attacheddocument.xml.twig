@@ -17,8 +17,8 @@
     <cbc:ProfileExecutionID>{{ doc.profileExecutionId }}</cbc:ProfileExecutionID>
     <cbc:ID>{{ doc.id }}</cbc:ID>
     {% if doc.issueDate %}
-    <cbc:IssueDate>{{ doc.issueDate|date('Y-m-d') }}</cbc:IssueDate>
-    <cbc:IssueTime>{{ doc.issueDate|date('H:i:s') }}</cbc:IssueTime>
+    <cbc:IssueDate>{{ doc.issueDate|date('Y-m-d', 'America/Bogota') }}</cbc:IssueDate>
+    <cbc:IssueTime>{{ doc.issueDate|date('H:i:sP', 'America/Bogota') }}</cbc:IssueTime>
     {% endif %}
     <cbc:DocumentType>Contenedor de Factura Electrónica</cbc:DocumentType>
     <cbc:ParentDocumentID>{{ doc.parentDocumentId }}</cbc:ParentDocumentID>
@@ -41,7 +41,7 @@
     <cac:ReceiverParty>
         <cac:PartyTaxScheme>
             <cbc:RegistrationName>{{ doc.receiver.razonSocial }}</cbc:RegistrationName>
-            <cbc:CompanyID schemeAgencyID="195" schemeID="0" schemeName="{{ doc.receiver.tipoDocumento }}">{{ doc.receiver.numeroDocumento }}</cbc:CompanyID>
+            <cbc:CompanyID schemeAgencyID="195"{% if doc.receiver.nitDv is not null %} schemeID="{{ doc.receiver.nitDv }}"{% endif %} schemeName="{{ doc.receiver.tipoDocumento }}">{{ doc.receiver.numeroDocumento }}</cbc:CompanyID>
             <cbc:TaxLevelCode>{{ doc.receiver.responsabilidades }}</cbc:TaxLevelCode>
             <cac:TaxScheme>
                 <cbc:ID>01</cbc:ID>
@@ -55,7 +55,7 @@
         <cac:ExternalReference>
             <cbc:MimeCode>text/xml</cbc:MimeCode>
             <cbc:EncodingCode>UTF-8</cbc:EncodingCode>
-            <cbc:Description><![CDATA[{{ doc.signedInvoiceXml }}]]></cbc:Description>
+            <cbc:Description>{{ doc.signedInvoiceXml|cdata }}</cbc:Description>
         </cac:ExternalReference>
     </cac:Attachment>
 
@@ -71,7 +71,7 @@
                 <cac:ExternalReference>
                     <cbc:MimeCode>text/xml</cbc:MimeCode>
                     <cbc:EncodingCode>UTF-8</cbc:EncodingCode>
-                    <cbc:Description><![CDATA[{{ doc.applicationResponseXml }}]]></cbc:Description>
+                    <cbc:Description>{{ doc.applicationResponseXml|cdata }}</cbc:Description>
                 </cac:ExternalReference>
             </cac:Attachment>
         </cac:DocumentReference>

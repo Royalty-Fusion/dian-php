@@ -1,0 +1,9 @@
+{#- params: doc, uuid, schemeName, profileId, profileExecId, uuidSchemeId, totals -#}
+<cbc:UBLVersionID>UBL 2.1</cbc:UBLVersionID>
+    <cbc:CustomizationID>{{ doc.customizationId }}</cbc:CustomizationID>
+    <cbc:ProfileID>{{ profileId }}</cbc:ProfileID>
+    <cbc:ProfileExecutionID>{{ profileExecId }}</cbc:ProfileExecutionID>
+    <cbc:ID>{{ doc.prefijo }}{{ doc.numero }}</cbc:ID>
+    <cbc:UUID schemeID="{{ uuidSchemeId }}" schemeName="{{ schemeName }}">{{ uuid }}</cbc:UUID>
+    <cbc:IssueDate>{{ totals.issueDate }}</cbc:IssueDate>
+    <cbc:IssueTime>{{ totals.issueTime }}</cbc:IssueTime>

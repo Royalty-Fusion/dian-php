@@ -9,25 +9,22 @@ use RoyaltyFusion\DianPhp\Model\Company;
 use RoyaltyFusion\DianPhp\Model\HasRichDocumentFields;
 use RoyaltyFusion\DianPhp\Model\Item;
 use RoyaltyFusion\DianPhp\Model\Payment;
+use RoyaltyFusion\DianPhp\Model\Resolution;
 use RoyaltyFusion\DianPhp\Model\Software;
 use RoyaltyFusion\DianPhp\Model\Tax;
 
 /**
- * Documento Soporte en Adquisiciones (DS).
+ * Documento Soporte en adquisiciones efectuadas a sujetos no obligados a
+ * expedir factura (DS) — Resolución DIAN 000167 de 2021, Anexo Técnico DS.
  *
- * Used when the supplier is NOT obligated to issue an electronic invoice
- * (e.g. natural persons under the income threshold). The acquirente becomes
- * the issuer and a CUDS hash replaces the CUFE.
+ * Roles in the XML:
+ *   - cac:AccountingSupplierParty = vendedor no obligado ({@see setSupplier()})
+ *   - cac:AccountingCustomerParty = adquiriente obligado, who issues and signs
+ *     the DS ({@see setCompany()})
  *
- * TODO (Phase 6 follow-up):
- *   - supportdocument.xml.twig template (CustomizationID = 11)
- *   - CudsGenerator (variant of CufeGenerator)
- *   - Adjustment Note (TipoDocumento=95) sister model + template
- *   - Wiring inside Dian facade with separate send() overload
- *   - Adjustment Note (TipoDocumento=95) sister model
- *
- * NOTE: Template, CUDS generator and builder are now implemented under
- * src/SupportDocument/{CudsGenerator,SupportDocumentBuilder,templates/}.
+ * CustomizationID: 10 = vendedor residente, 11 = vendedor no residente.
+ * The hash is the CUDS ({@see CudsGenerator}) and needs a DS numbering
+ * resolution ({@see setResolution()}).
  */
 class SupportDocument
 {
@@ -174,5 +171,90 @@ class SupportDocument
     public function getTestSetId(): string
     {
         return $this->testSetId;
+    }
+
+    public const RESIDENTE    = '10';
+    public const NO_RESIDENTE = '11';
+
+    public const TRANSMISION_POR_OPERACION   = '1';
+    public const TRANSMISION_ACUMULADO_SEMANAL = '2';
+
+    private ?Resolution $resolution = null;
+    private string $customizationId = self::RESIDENTE;
+    private string $transmissionCode = self::TRANSMISION_POR_OPERACION;
+    private ?\DateTimeInterface $purchaseDate = null;
+    private ?\DateTimeInterface $dueDate = null;
+
+    /** Resolución de numeración del Documento Soporte (prefijo y rango). */
+    public function setResolution(Resolution $resolution): self
+    {
+        $this->resolution = $resolution;
+        return $this;
+    }
+
+    public function getResolution(): ?Resolution
+    {
+        return $this->resolution;
+    }
+
+    /** 10 = vendedor residente (default), 11 = vendedor no residente en Colombia. */
+    public function setCustomizationId(string $customizationId): self
+    {
+        $this->customizationId = $customizationId;
+        return $this;
+    }
+
+    public function getCustomizationId(): string
+    {
+        return $this->customizationId;
+    }
+
+    /**
+     * Forma de generación y transmisión (cac:InvoicePeriod/cbc:DescriptionCode of every line):
+     * 1 = por operación (default), 2 = acumulado semanal.
+     */
+    public function setTransmissionCode(string $transmissionCode): self
+    {
+        $this->transmissionCode = $transmissionCode;
+        return $this;
+    }
+
+    public function getTransmissionCode(): string
+    {
+        return $this->transmissionCode;
+    }
+
+    public function getTransmissionDescription(): string
+    {
+        return $this->transmissionCode === self::TRANSMISION_ACUMULADO_SEMANAL ? 'Acumulado semanal' : 'Por operación';
+    }
+
+    /** Fecha de la compra (defaults to the issue date). */
+    public function setPurchaseDate(\DateTimeInterface $purchaseDate): self
+    {
+        $this->purchaseDate = $purchaseDate;
+        return $this;
+    }
+
+    public function getPurchaseDate(): ?\DateTimeInterface
+    {
+        return $this->purchaseDate ?? $this->getFecha();
+    }
+
+    public function setDueDate(\DateTimeInterface $dueDate): self
+    {
+        $this->dueDate = $dueDate;
+        return $this;
+    }
+
+    public function getDueDate(): ?\DateTimeInterface
+    {
+        return $this->dueDate;
+    }
+
+    /** Alias so generic code (QR, reports) can treat the seller as the counterpart. */
+    public function getClient(): ?Client
+    {
+        return $this->getSupplier();
     }
 }

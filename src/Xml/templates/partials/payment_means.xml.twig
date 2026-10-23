@@ -1,0 +1,8 @@
+{#- params: doc -#}
+{% for payment in doc.payments %}
+    <cac:PaymentMeans>
+        <cbc:ID>{{ payment.methodId }}</cbc:ID>
+        <cbc:PaymentMeansCode>{{ payment.meansId }}</cbc:PaymentMeansCode>
+        {% if payment.dueDate %}<cbc:PaymentDueDate>{{ payment.dueDate|date('Y-m-d') }}</cbc:PaymentDueDate>{% endif %}
+    </cac:PaymentMeans>
+{% endfor %}
