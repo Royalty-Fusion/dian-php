@@ -8,7 +8,7 @@
 | 3 | Modelos enriquecidos (Address, Charge, Prepayment, ...) | ✅ |
 | 4 | Template `invoice.xml.twig` 100% Anexo V1.9 | ✅ |
 | 5 | Templates `creditnote.xml.twig` y `debitnote.xml.twig` | ✅ |
-| 6 | Documento Soporte (DS) + Nota Ajuste DS | ✅ DS completo (NotaAjuste pendiente) |
+| 6 | Documento Soporte (DS) + Nota Ajuste DS | ✅ Completo |
 | 7 | Nómina Electrónica (NIE) | ✅ Completo |
 | 8 | RADIAN (eventos de título valor) | ✅ Completo |
 | 9 | Validators (BusinessRule + XSD) | ✅ |
@@ -21,31 +21,14 @@
 | 16 | DS + RADIAN + Nómina + extras (lopezsoft) | ✅ Completo |
 | 17 | Catálogos DANE/DIAN completos + REST blueprint | ✅ Completo |
 | 18 | Pulido: ejemplos + docs + CHANGELOG | ✅ Completo |
+| 21 | Firma XAdES verificada, escape XML, cálculos y CUFE unificados, XSD incluidos | ✅ |
+| 22 | WS-Security, cliente SOAP robusto, preflight, `dian-doctor`, guía de integración | ✅ |
 
 ## Próximos hitos
 
-### Fase 6 (Documento Soporte) — completar
-* `src/Xml/templates/supportdocument.xml.twig`
-* `CudsGenerator` (hash específico)
-* `SupportDocumentAdjustmentNote` (TipoDoc=95)
-* Wiring en `Dian::send()` con override de tipo
-
-### Fase 7 (Nómina) — completar
-* Modelos `Devengado`, `Deducciones`, `EmpleadorTrabajador`
-* `nomina-individual.xml.twig` + `nomina-ajuste.xml.twig`
-* `CuneGenerator`
-* `PayrollSoapClient` contra `apifedi.dian.gov.co/Nomina`
-
-### Fase 8 (RADIAN) — completar
-* `ApplicationResponse.xml.twig`
-* Firmador separado (cert del receptor)
-* `RadianSoapClient.sendEventUpdateStatus()`
-* Mapeo de transiciones de estado en `Invoice`
-
-### Otras mejoras pendientes
-* `CustomizationID` dinámico por `TipoOperacion` en factura
-* Validación XSD con el zip oficial vendor-eado
-* Snapshot tests golden master con XMLs del set de pruebas DIAN
-* Provider de eventos en el bundle (`PreSendEvent`, `PostSendEvent`, `ValidationFailedEvent`)
-* `BinaryReceipt` WS-Security para `SendBillSync`
-* Catálogo completo de municipios DANE en `resources/catalogs/municipios.csv`
+* Confirmar en habilitación real: WS-Security, CUDS, CUDE de eventos RADIAN y nómina.
+* Nómina de ajuste (`TipoXML=103`) y XSD de nómina para validación local.
+* Golden masters de documento soporte, nota débito, nómina y eventos RADIAN reales.
+* Facturas del sector salud y otros anexos sectoriales.
+* Eventos del bundle Symfony (`PreSendEvent`, `PostSendEvent`, `ValidationFailedEvent`).
+* Paquete de integración nativo para Laravel (hoy: ejemplo en la guía).

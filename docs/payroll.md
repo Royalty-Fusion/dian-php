@@ -86,14 +86,15 @@ Nómina usa el **mismo endpoint VPFE** que las facturas — el discriminador es
 el SOAP action `SendNominaSync` (síncrono, recibes la validación en el call).
 
 ```php
-use RoyaltyFusion\DianPhp\Ws\SoapClient;
-use RoyaltyFusion\DianPhp\Signer\XadesSigner;
-
-$signed = (new XadesSigner('/path/cert.p12', 'pwd'))->sign($xml);
-$result = (new SoapClient(SoapClient::ENV_HABILITACION))->sendNominaSync($signed, $cune);
+$dian   = new Dian('/path/cert.p12', 'pwd', SoapClient::ENV_HABILITACION);
+$result = $dian->sendPayroll($nomina, $testSetIdNomina);   // TestSetId solo en habilitación
 
 echo $result->isSuccess() ? 'OK' : $result->getErrorMessage();
 ```
+
+`sendPayroll()` fija el ambiente, calcula el CUNE con el PIN del software,
+genera el XML en el namespace `dian:gov:co:facturaelectronica:NominaIndividual`,
+lo firma y lo envía en ZIP.
 
 Ver [docs/connections-reference.md](./connections-reference.md) para la
 tabla completa de las 13 operaciones SOAP soportadas.
@@ -102,4 +103,6 @@ tabla completa de las 13 operaciones SOAP soportadas.
 
 * **Nómina de Ajuste** (`TipoXML=103`) — reemplazo o eliminación de una nómina
   previa por CUNE.
-* **Golden master** contra un XML real de Nómina aprobado.
+* **Golden master** contra un XML real de Nómina aprobado y XSD de nómina:
+  el SDK aún no valida la nómina contra su esquema; confírmela en el set de
+  pruebas de nómina.

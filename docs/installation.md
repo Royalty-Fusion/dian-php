@@ -52,8 +52,19 @@ el documento antes de enviarlo:
 $invoice->setTestSetId('a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d');
 ```
 
-El SDK detecta automáticamente el set y usa `SendTestSetAsync`. Cuando ya estés en
-producción, simplemente omite el `testSetId` y se usará `SendBillAsync`.
+En habilitación el SDK detecta el set y usa `SendTestSetAsync` (asíncrono: el
+resultado se consulta con `waitForResult($zipKey)`). Sin `testSetId`, y siempre
+en producción, usa `SendBillSync`, que devuelve la validación inmediatamente.
+
+## Certificados y OpenSSL 3
+
+Si al abrir el `.p12` aparece *cifrado heredado*, conviértalo con
+`openssl pkcs12 -legacy` (ver [troubleshooting](./troubleshooting.md)).
+Compruebe todo el entorno con:
+
+```bash
+vendor/bin/dian-doctor --cert=/ruta/empresa.p12 --password='***'
+```
 
 ## Comprobar la instalación
 

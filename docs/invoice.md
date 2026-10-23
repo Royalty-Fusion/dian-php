@@ -114,5 +114,6 @@ $invoice
 | Transporte | `TipoOperacion::TRANSPORTE` | `13` |
 | Notarios | `TipoOperacion::NOTARIOS` | `15` |
 
-> Hoy la plantilla hardcodea `10`. La selección dinámica por `tipoOperacion`
-> está en el roadmap como `Phase 4 follow-up`.
+Se selecciona con `$invoice->setTipoOperacion(TipoOperacion::AIU)`; el tipo de
+factura (01 venta, 02 exportación, 03/04 contingencia) con
+`$invoice->setTipoFactura(TipoFactura::EXPORTACION)`.

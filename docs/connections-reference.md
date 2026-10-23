@@ -24,42 +24,48 @@ cambia el ambiente (Producción / Habilitación) y el SOAP action.
 
 Todas tienen base `http://wcf.dian.colombia/IWcfDianCustomerServices/<Operation>`.
 
-### Envío (producción)
+Todas las llamadas llevan **WS-Addressing** (`wsa:Action`, `wsa:To`) y
+**WS-Security** (`wsse:BinarySecurityToken` con el certificado X.509,
+`wsu:Timestamp` y firma RSA-SHA256 de `wsa:To` con C14N exclusivo), generados
+por `RoyaltyFusion\DianPhp\Ws\WsSecurity`. Los documentos viajan en un ZIP
+codificado en base64.
 
-| Operación | Método SDK | Síncrono | Uso típico |
+### Envío
+
+| Operación | Método SDK | Respuesta | Uso típico |
 |---|---|:-:|---|
-| `SendBillAsync` | `send()` | ❌ | Factura / NC / ND — flujo estándar |
-| `SendBillSync` | `sendBillSync()` | ✅ | Mismo doc pero recibes validación inmediata |
-| `SendBillAttachmentAsync` | `sendBillAttachmentAsync()` | ❌ | Cuando envías el XML con anexos binarios |
-| `SendNominaSync` | `sendNominaSync()` | ✅ | Nómina Electrónica (NIE) |
-| `SendEventUpdateStatus` | `sendEventUpdateStatus()` | ✅ | Eventos RADIAN |
+| `SendBillSync` | `send()` sin TestSetId / `sendBillSync()` | Inmediata | Factura, NC, ND y DS en producción |
+| `SendTestSetAsync` | `send()` con `setTestSetId()` en habilitación | `ZipKey` | Set de pruebas |
+| `SendBillAsync` | `sendBillAsync()` | `ZipKey` | Envío por lotes |
+| `SendBillAttachmentAsync` | `sendBillAttachmentAsync()` | `ZipKey` | XML con anexos |
+| `SendNominaSync` | `sendNominaSync()` / `Dian::sendPayroll()` | Inmediata | Nómina electrónica |
+| `SendEventUpdateStatus` | `sendEventUpdateStatus()` / `Dian::sendEvent()` | Inmediata | Eventos RADIAN |
 
-### Envío (Habilitación / set de pruebas)
-
-| Operación | Método SDK | Discriminador |
-|---|---|---|
-| `SendTestSetAsync` | `send()` auto-detecta con `setTestSetId()` | El testSetId asignado por DIAN al solicitar habilitación |
+Los envíos asíncronos devuelven un `Result` con `isPending() === true` y
+`getZipKey()`; consulte el resultado final con `Dian::waitForResult($zipKey)`.
 
 ### Consulta
 
-| Operación | Método SDK | Pasa | Devuelve |
+| Operación | Método SDK | Parámetros | Devuelve |
 |---|---|---|---|
-| `GetStatus` | `getStatus(trackId)` | CUFE/CUDE | `StatusResult` (b:IsValid, b:StatusCode, b:StatusDescription) |
-| `GetStatusZip` | `getStatusZip(trackId)` | CUFE/CUDE | `StatusResult` + ApplicationResponse XML descomprimido |
-| `GetStatusEvent` | `getStatusEvent(trackId)` | CUFE | Eventos RADIAN registrados |
-| `GetNumberingRange` | `getNumberingRange(NIT, NIT-proveedor, softwareId)` | 3 strings | Rangos autorizados (resoluciones) |
-| `GetXmlByDocumentKey` | `getXmlByDocumentKey(trackId)` | CUFE/CUDE | XML firmado original (b64-decoded) |
-| `GetAcquirer` | `getAcquirer(NIT, NIT-proveedor, softwareId)` | 3 strings | Datos del adquiriente registrado |
-| `GetExchangeEmails` | `getExchangeEmails(NIT, NIT-proveedor, softwareId)` | 3 strings | Emails de notificación registrados |
-| `GetReferenceNotes` | `getReferenceNotes(CUFE)` | CUFE | NC/ND que referencian la factura |
+| `GetStatus` | `getStatus($trackId)` | CUFE/CUDE o ZipKey | `StatusResult` |
+| `GetStatusZip` | `getStatusZip($trackId)` / `Dian::getStatus()` | CUFE/CUDE o ZipKey | `StatusResult` + ApplicationResponse descomprimido |
+| `GetNumberingRange` | `getNumberingRanges($nit, $nitProveedor, $softwareId)` | 3 | Resoluciones con `TechnicalKey` |
+| `GetXmlByDocumentKey` | `getXmlByDocumentKey($cufe)` | CUFE/CUDE | XML firmado |
+| `GetStatusEvent` | `getStatusEvent($cufe)` | CUFE | Eventos RADIAN (XML) |
+| `GetReferenceNotes` | `getReferenceNotes($cufe)` | CUFE | NC/ND que referencian la factura (XML) |
+| `GetAcquirer` | `getAcquirer($tipoDoc, $numero)` | 2 | Datos del adquiriente (XML) |
+| `GetExchangeEmails` | `getExchangeEmails()` | 0 | Correos de recepción (XML) |
 
-**Total: 13 operaciones SOAP soportadas** (las 8 más usadas + 5 de configuración).
+Cualquier otra operación, o una variante de parámetros, se puede llamar con
+`SoapClient::call('Operacion', ['parametro' => 'valor'])`, que devuelve un
+`DianResponse` ya interpretado (incluidos los SOAP Fault).
 
 ## Constantes XAdES (firma digital)
 
 ```
 POLICY_URL          = https://facturaelectronica.dian.gov.co/politicadefirma/v2/politicadefirmav2.pdf
-POLICY_HASH_SHA256  = dMoQAOR5HscatV9QLJ864wS6u2bM=
+POLICY_HASH_SHA256  = dMoMvtcG5aIzgYo0tIsSQeVJBDnUnfSOfBpxXrmor0Y=
 POLICY_DESCRIPTION  = Política de firma para facturas electrónicas de la República de Colombia
 SIGNATURE_ALGORITHM = RSA-SHA256
 CANONICALIZATION    = http://www.w3.org/TR/2001/REC-xml-c14n-20010315  (C14N inclusive)
@@ -67,8 +73,10 @@ DIGEST_ALGORITHM    = SHA-256
 HASH_ALGORITHM      = SHA-384  (para CUFE / CUDE / CUDS / CUNE)
 ```
 
-> Cross-checked con `lopezsoft/ubl21dian` y con la fixture real de Siigo —
-> los 4 hashes coinciden byte a byte.
+> El hash de la política y la estructura de la firma (3 referencias: documento,
+> KeyInfo y SignedProperties) se tomaron de documentos reales aprobados por la
+> DIAN (`resources/fixtures`), y `SignatureVerifier` valida esas firmas en la
+> suite de pruebas.
 
 ## Namespaces UBL emitidos
 
@@ -135,17 +143,15 @@ Configurable vía `new XmlBuilder(twig: null, environment: '2', uuidSchemeId: '1
 | Compresión envío | ZIP DEFLATE (estándar `ZipArchive`) |
 | Inner XML del AttachedDocument | embebido en `<![CDATA[...]]>` |
 
-## ¿Qué seguimos sin tener?
+## Estado de cada pieza
 
-Honestidad total:
-
-| Pieza | Estado | Cuándo se necesita |
-|---|---|---|
-| **WS-Security `BinarySecurityToken`** (`wsse:Security` header en SOAP) | ❌ No implementado | Requerido para `SendBillSync` con producción real. `SendBillAsync` no lo necesita y es lo más común. |
-| **Cliente SSL con bundle de certs** | ✅ Usa el bundle del sistema (curl/symfony-http-client default) | OK para 99% de casos. Si DIAN cambia su CA, hay que actualizar. |
-| **Validación XSD contra el zip oficial** | ⚠️ Solo si descargas el zip a `resources/xsd/` | Opcional. La mayoría usa el `BusinessRuleValidator`. |
-| **Reintentos exponenciales** | ❌ No hay middleware de retry | Implementar si tu ERP envía alto volumen — VPFE a veces tira 500. |
-| **Logging estructurado** | ❌ No PSR-3 todavía | Wire de un `LoggerInterface` opcional al `SoapClient` queda pendiente. |
+| Pieza | Estado |
+|---|---|
+| WS-Security en todas las llamadas | ✅ Implementado y verificado de forma independiente; pendiente de confirmar contra la DIAN en vivo |
+| Validación XSD | ✅ Esquemas UBL 2.1 + DIAN incluidos en `resources/xsd` (sin red) |
+| Reintentos | ✅ 2 reintentos con espera exponencial ante errores de red y HTTP 5xx |
+| Logging | ✅ PSR-3 opcional (`Dian::setLogger`, `SoapClient::setLogger`) |
+| TLS | Bundle de CA del sistema (symfony/http-client) |
 
 ## Verificar conectividad manualmente
 

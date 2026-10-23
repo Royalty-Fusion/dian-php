@@ -92,6 +92,20 @@ final class DianFacadeTest extends TestCase
         $this->assertStringStartsWith('nc', $result->getFileName());
     }
 
+    public function testAttachedDocumentIsBuiltAndSigned(): void
+    {
+        $ok   = '<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body><SendBillSyncResponse xmlns="http://wcf.dian.colombia"><SendBillSyncResult xmlns:b="x"><b:IsValid>true</b:IsValid><b:StatusCode>00</b:StatusCode><b:XmlBase64Bytes>PEFwcGxpY2F0aW9uUmVzcG9uc2UvPg==</b:XmlBase64Bytes></SendBillSyncResult></SendBillSyncResponse></s:Body></s:Envelope>';
+        $dian = $this->dian($ok)->validateBeforeSend(false);
+        $invoice = DocumentFactory::invoice();
+
+        $result   = $dian->send($invoice);
+        $attached = $dian->buildAttachedDocument($invoice, $result);
+
+        $this->assertSame([], (new SignatureVerifier())->verify($attached));
+        $this->assertStringContainsString('<cbc:ParentDocumentID>SETP990000001</cbc:ParentDocumentID>', $attached);
+        $this->assertStringContainsString('<![CDATA[<ApplicationResponse/>]]>', $attached);
+    }
+
     public function testInvalidEnvironmentIsRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);

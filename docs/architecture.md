@@ -1,75 +1,79 @@
 # Arquitectura
 
-## Disposición de carpetas (estilo Greenter)
+## Carpetas
 
 ```
 src/
-├── Dian.php                  Facade principal (alias del "See" de Greenter)
-├── Model/                    DTOs planos (Invoice, CreditNote, Company, ...)
-├── Catalog/                  Enums DIAN (Tributo, FormaPago, Pais, ...)
-├── Xml/                      Builder + Calculadora + CUFE + QR + templates Twig
-├── Signer/                   XadesSigner (XAdES-EPES + política DIAN v2)
-├── Ws/                       Cliente SOAP (SendBill, GetStatus, GetStatusZip)
-├── Validator/                Reglas de negocio + validador XSD
-├── Report/                   Representación gráfica HTML (PDF-ready)
-├── SupportDocument/          DS — scaffold
-├── Payroll/                  Nómina Electrónica — scaffold
-├── Radian/                   Eventos título valor — scaffold
-└── Bridge/Symfony/           Bundle (Configuration, DI, services.yaml, command)
+├── Dian.php                  Facade (preflight, send, consultas, AttachedDocument)
+├── Model/                    Modelos planos (Invoice, CreditNote, Company, Item, Tax…)
+├── Catalog/                  Enums y registros DIAN/DANE
+├── Xml/                      DocumentCalculator, CufeGenerator, QrGenerator, XmlBuilder,
+│                             TwigFactory, plantillas Twig + parciales compartidos
+├── Signer/                   Certificate, XadesSigner, SignatureVerifier
+├── Ws/                       SoapClient, WsSecurity, DianResponse, StatusResult, FileNameGenerator
+├── Validator/                BusinessRuleValidator, XsdValidator, XmlConsistencyChecker,
+│                             CertificateChecker, PreflightReport
+├── SupportDocument/          Documento soporte y nota de ajuste
+├── Payroll/                  Nómina electrónica
+├── Radian/                   Eventos RADIAN (ApplicationResponse)
+├── AttachedDocument/         Contenedor para el adquiriente
+├── Report/                   Representación gráfica HTML
+├── Tools/                    Doctor (diagnóstico de entorno)
+└── Bridge/Symfony/           Bundle, configuración, comandos
 ```
 
-## Flujo end-to-end
+## Flujo de `Dian::send()`
 
 ```
-                          $invoice                 ┌──────────────┐
-                              │                    │ Validator    │
-                              │  validateBeforeSend?│ (opt-in)     │
-                              ▼                    └──────────────┘
-                       ┌──────────────┐
-                       │ CufeGenerator│ → CUFE / CUDE (SHA-384)
-                       └──────────────┘
-                              │
-                              ▼
-                       ┌──────────────┐
-                       │ QrGenerator  │ → URL QR para VPFE
-                       └──────────────┘
-                              │
-                              ▼
-                       ┌──────────────┐
-                       │ XmlBuilder   │ → Twig + DocumentCalculator
-                       └──────────────┘
-                              │
-                              ▼
-                       ┌──────────────┐
-                       │ XadesSigner  │ → XAdES-EPES + política v2
-                       └──────────────┘
-                              │
-                              ▼
-                       ┌──────────────┐
-                       │ SoapClient   │ → ZIP + SOAP 1.2 + DIAN VPFE
-                       └──────────────┘
-                              │
-                              ▼
-                            Result
+ documento PHP
+      │
+      ▼
+ BusinessRuleValidator ──── errores ──▶ Result fallido (nada se envía)
+      │
+      ▼
+ DocumentCalculator  (única fuente de totales para XML, CUFE y QR)
+      │
+      ├──▶ CufeGenerator (CUFE / CUDE)      QrGenerator (contenido del QR)
+      ▼
+ XmlBuilder  (Twig con escape XML)  ──▶  XadesSigner (XAdES-EPES)
+      │
+      ▼
+ XsdValidator + SignatureVerifier + XmlConsistencyChecker ── errores ──▶ Result fallido
+      │
+      ▼
+ SoapClient  (ZIP + WS-Security + WS-Addressing, reintentos)
+      │
+      ▼
+ DianResponse ──▶ Result (isSuccess / isPending + ZipKey / errores y notificaciones)
 ```
 
-## Por qué Twig
+## Decisiones
 
-Greenter popularizó el patrón de mantener cada plantilla XML como un archivo
-`*.xml.twig` legible — funciona como un XSD comentado al que cualquier dev de
-backoffice puede leer sin saber UBL. Los templates viven en
-`src/Xml/templates/` y se renderizan con `autoescape: false` porque el XML ya
-controla su propio escape.
+**Una sola fuente de cálculo.** La DIAN recalcula el CUFE con los valores
+del XML. `DocumentCalculator` produce todos los montos (redondeados a 2
+decimales) y tanto las plantillas como `CufeGenerator` y `QrGenerator` los
+toman de ahí, así que no pueden divergir. `XmlConsistencyChecker` lo
+comprueba desde el XML final, como haría la DIAN.
 
-## Por qué no `ext-soap`
+**Twig con escape XML.** Las plantillas son legibles como un XSD comentado y
+comparten parciales (`templates/partials`). `TwigFactory` escapa todo valor y
+elimina caracteres de control, de modo que textos como "Pérez & Cía" nunca
+rompen el documento.
 
-`ext-soap` es brittle con WCF/Microsoft endpoints (que es lo que expone DIAN),
-no soporta SOAP 1.2 con WS-Addressing limpio y mete capas de magia para
-firmar. Empaquetamos el ZIP a mano y enviamos el envelope vía
-`symfony/http-client` — más simple, más predecible y testeable.
+**Firma propia sobre DOM.** `XadesSigner` construye la firma con la misma
+estructura de los documentos aprobados por la DIAN (`resources/fixtures`) y
+`SignatureVerifier` la verifica; ambos se prueban contra esos documentos.
+
+**SOAP sin `ext-soap`.** El servicio de la DIAN es WCF con SOAP 1.2,
+WS-Addressing y WS-Security. `WsSecurity` arma y firma el sobre y
+`symfony/http-client` lo envía; las respuestas se leen por `local-name()`
+porque WCF cambia los prefijos.
+
+**Validación sin red.** Los XSD de UBL 2.1 + DIAN se incluyen en
+`resources/xsd` con rutas locales.
 
 ## Inyección de dependencias
 
-Todo es opt-in: el facade `Dian` instancia los colaboradores por defecto, pero
-cada uno se puede sobrescribir con `set*()`. El bundle de Symfony los registra
-como servicios autowireables.
+El facade crea sus colaboradores con la configuración correcta del ambiente;
+cada uno se puede reemplazar (`setSoapClient`, `setValidator`, `setLogger`…).
+El bundle de Symfony los registra como servicios.

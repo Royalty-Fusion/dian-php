@@ -8,7 +8,8 @@ desacoplada de [Greenter](https://github.com/giansalex/greenter).
 
 | Sección | Lo que vas a aprender |
 |---|---|
-| [Instalación](./installation.md) | Composer, requisitos del sistema, certificado de prueba. |
+| [**Guía de integración**](./integration-guide.md) | **De cero a producción: registro DIAN, set de pruebas, producción, Laravel/Symfony, errores y checklists.** |
+| [Instalación](./installation.md) | Composer, requisitos del sistema, certificado y `dian-doctor`. |
 | [Quick start](./quick-start.md) | Tu primera factura firmada en menos de 5 minutos. |
 | [Factura electrónica](./invoice.md) | Modelo `Invoice` completo, descuentos, anticipos, retenciones. |
 | [Notas crédito / débito](./credit-debit-notes.md) | Cuándo usar `CreditNote` vs `DebitNote`, códigos de discrepancia. |
@@ -16,9 +17,9 @@ desacoplada de [Greenter](https://github.com/giansalex/greenter).
 | [Nómina Electrónica](./payroll.md) | NIE con 28 devengados + 21 deducciones + CUNE. |
 | [RADIAN (eventos)](./radian.md) | Acuse, Recibo, Aceptación, Endoso, Pago — 13 eventos. |
 | [AttachedDocument](./attached-document.md) | Contenedor B2B — parser + builder. |
-| [Validación](./validation.md) | `BusinessRuleValidator`, `XsdValidator`, reglas oficiales. |
+| [Validación previa](./validation.md) | `preflight()`: reglas con código, XSD, firma y recálculo del CUFE. |
 | [Representación gráfica](./report.md) | `HtmlReport` + integración con dompdf/mpdf. |
-| [Bundle Symfony](./symfony.md) | DI, configuración YAML, comando `dian:status`. |
+| [Bundle Symfony](./symfony.md) | DI, configuración YAML, comandos `dian:doctor` y `dian:status`. |
 | [REST API blueprint](./rest-api-blueprint.md) | Diseño recomendado de endpoints REST para tu ERP. |
 | [Conexiones DIAN](./connections-reference.md) | URLs, SOAP actions, namespaces, constantes — referencia completa. |
 | [Arquitectura](./architecture.md) | Cómo está organizado el SDK (estilo Greenter). |
@@ -31,9 +32,9 @@ desacoplada de [Greenter](https://github.com/giansalex/greenter).
 | Factura Electrónica de Venta | ✅ Completo |
 | Nota Crédito (con / sin referencia) | ✅ Completo |
 | Nota Débito (con / sin referencia) | ✅ Completo |
-| Documento Soporte (DS) | ✅ Completo |
-| Nómina Electrónica (NIE) | ✅ Completo |
-| RADIAN (eventos de título valor) | ✅ Completo |
+| Documento Soporte (DS) + nota de ajuste | ✅ Completo (CUDS por confirmar en habilitación) |
+| Nómina Electrónica (NIE) | ✅ Individual (nómina de ajuste pendiente) |
+| RADIAN (eventos de título valor) | ✅ Completo (por confirmar en habilitación RADIAN) |
 | AttachedDocument (B2B) | ✅ Builder + Parser |
 
 Ver el [roadmap](./roadmap.md) para detalle.
@@ -44,6 +45,7 @@ Ver el [roadmap](./roadmap.md) para detalle.
 * **Catálogos como enums** — `Tributo::IVA`, `FormaPago::CREDITO`, validados al instante.
 * **Templates Twig visibles** — `src/Xml/templates/invoice.xml.twig` se lee como un XSD comentado.
 * **Servicios desacoplados** — cada paso (`CufeGenerator`, `XmlBuilder`, `XadesSigner`, `SoapClient`) es inyectable y testeable.
+* **Validación antes de enviar** — `preflight()` detecta localmente lo que la DIAN rechazaría.
 * **Sin `ext-soap`** — usamos `symfony/http-client` + ZIP nativo.
 * **Sin frameworks obligatorios** — el bundle de Symfony es opcional, los componentes core funcionan en cualquier app PHP.
 

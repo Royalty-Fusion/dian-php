@@ -50,10 +50,10 @@ $software = (new Software())
 // 4. Resolución de facturación electrónica
 $resolution = (new Resolution())
     ->setNumber('18760000001')
-    ->setPrefix('SETT')
+    ->setPrefix('SETP')
     ->setFrom('990000000')->setTo('995000000')
-    ->setDateFrom(new DateTimeImmutable('2026-01-01'))
-    ->setDateTo(new DateTimeImmutable('2026-12-31'));
+    ->setDateFrom(new DateTimeImmutable('2019-01-19'))
+    ->setDateTo(new DateTimeImmutable('2030-01-19'));
 
 // 5. Línea + impuesto
 $iva = (new Tax())->setCode('01')->setName('IVA')->setPercent(19.0)
@@ -69,33 +69,33 @@ $item = (new Item())
 
 // 6. Documento + pago
 $invoice = (new Invoice())
-    ->setPrefijo('SETT')->setNumero('990000001')
+    ->setPrefijo('SETP')->setNumero('990000001')
     ->setFecha(new DateTimeImmutable('now'))
     ->setCompany($company)
     ->setClient($client)
     ->setSoftware($software)
     ->setResolution($resolution)
-    ->setTechnicalKey('fc84fa2d9d0e2d147814b74bb20942d45a990000')
+    ->setTechnicalKey('fc8eac422eba16e22ffd8c6f94b3f40a6e38162c')   // clave pública del set de pruebas
     ->setTestSetId('a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d')  // omitir en prod
-    ->setTotal(119000.0)
-    ->addItem($item)
-    ->addTax($iva)
+    ->addItem($item)                       // los totales los calcula el SDK
     ->addPayment((new Payment())
         ->setMethodId('2')                 // 2 = Crédito
         ->setMeansId('42')                 // 42 = Consignación
         ->setDueDate(new DateTimeImmutable('+30 days')));
 
-// 7. Enviar
-$dian = (new Dian(
-    getenv('DIAN_CERT_PATH'),
-    getenv('DIAN_CERT_PASSWORD'),
-    SoapClient::ENV_HABILITACION
-))->validateBeforeSend(true);
+// 7. Validar sin enviar (preflight) y luego enviar
+$dian = new Dian(getenv('DIAN_CERT_PATH'), getenv('DIAN_CERT_PASSWORD'), SoapClient::ENV_HABILITACION);
 
-$result = $dian->send($invoice);
+$report = $dian->preflight($invoice);
+echo $report->toText(), "\n";
+
+$result = $dian->send($invoice);          // vuelve a validar y no envía si hay errores
 
 if ($result->isSuccess()) {
     echo "✔ CUFE: {$result->getCufe()}\n";
+} elseif ($result->isPending()) {         // set de pruebas: asíncrono
+    $status = $dian->waitForResult($result->getZipKey());
+    echo $status->isValid() ? "✔ Aceptado\n" : '✗ ' . implode("\n", $status->getErrorMessages()) . "\n";
 } else {
     echo "✗ {$result->getErrorMessage()}\n";
 }
@@ -104,5 +104,7 @@ if ($result->isSuccess()) {
 ## Variantes
 
 * **Solo generar XML sin enviar:** `$dian->getSignedXml($invoice);`
-* **Consultar estado luego:** `bin/console dian:status <cufe>` (bundle Symfony)
+* **Diagnóstico del entorno:** `vendor/bin/dian-doctor --cert=… --password=…`
+* **Consultar estado luego:** `$dian->getStatus($cufeOZipKey)` o `bin/console dian:status <cufe>`
+* **Paso a paso hasta producción:** [guía de integración](./integration-guide.md)
 * **Renderizar la representación gráfica:** ver [report.md](./report.md).

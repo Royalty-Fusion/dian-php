@@ -48,31 +48,39 @@ $xml = (new ApplicationResponseBuilder())->build($evento);
 ## Diferencias con la factura
 
 * El XML root es `<ApplicationResponse>`, no `<Invoice>`.
-* **Solo 1 `<ext:UBLExtension>`** (la factura tiene 2). El `XadesSigner`
-  detecta esto automáticamente.
+* Dos `<ext:UBLExtension>`, como el ApplicationResponse que emite la propia
+  DIAN: `sts:DianExtensions` (software, código de seguridad, QR) y el espacio
+  para la firma, que `XadesSigner` ubica automáticamente.
 * La firma es del **receptor del evento**, no del emisor de la factura
   original — usa un certificado distinto.
 * No lleva `LegalMonetaryTotal` ni líneas.
 
-## Envío al WS
+## Envío
 
-RADIAN usa el **mismo endpoint VPFE** con el SOAP action
-`SendEventUpdateStatus` (síncrono).
-
-```php
-use RoyaltyFusion\DianPhp\Ws\SoapClient;
-
-$signed = (new XadesSigner('/path/cert.p12', 'pwd'))->sign($xmlEvento);
-$result = (new SoapClient(SoapClient::ENV_HABILITACION))->sendEventUpdateStatus($signed, $cudeEvento);
-```
-
-También puedes consultar los eventos registrados sobre un CUFE:
+El facade calcula el CUDE (si no lo indicó), construye, firma y envía con
+`SendEventUpdateStatus`:
 
 ```php
-$eventos = (new SoapClient(SoapClient::ENV_PRODUCCION))->getStatusEvent($cufeFactura);
+$evento->setSoftware($software);              // SoftwareID y PIN de quien genera el evento
+$evento->setPerson('1010101010', 'Ana', 'Pérez', 'Almacenista', 'Bodega');   // requerido en 032
+
+$dian   = new Dian($certReceptor, $clave, SoapClient::ENV_HABILITACION);
+$result = $dian->sendEvent($evento);
 ```
 
-## Pendiente
+Consultar los eventos registrados sobre una factura:
 
-* **CUDE específico para eventos** (algoritmo distinto al de NC/ND) —
-  implementar `EventCudeGenerator`.
+```php
+$xml = $dian->getSoapClient()->getStatusEvent($cufeFactura);
+```
+
+## CUDE del evento
+
+```
+CUDE = SHA-384(NumEvento + FecEmi + HorEmi + NitEmisorEvento + DocReceptor
+               + ResponseCode + NumFactura + DocumentTypeCode + PinSoftware)
+```
+
+Implementado en `EventCudeGenerator` (`buildString()` devuelve la cadena previa).
+La estructura del evento valida contra el XSD; la fórmula y los campos
+exigidos por cada código de evento deben confirmarse en habilitación RADIAN.

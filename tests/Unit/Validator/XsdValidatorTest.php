@@ -67,6 +67,15 @@ final class XsdValidatorTest extends TestCase
         $this->assertStringContainsString('cbc:Inventado', implode("\n", $result->messages()));
     }
 
+    public function testLongCertificateSerialNumbersAreAccepted(): void
+    {
+        $doc    = DocumentFactory::invoice();
+        $signed = (new XadesSigner(TestCertificate::path(), TestCertificate::PASSWORD))->sign((new XmlBuilder())->build($doc, 'x', 'qr'));
+        $signed = (string) preg_replace('#<ds:X509SerialNumber>\d+</ds:X509SerialNumber>#', '<ds:X509SerialNumber>77731540194324033225762167708893181572760167714</ds:X509SerialNumber>', $signed);
+
+        $this->assertSame([], (new XsdValidator())->validate($signed)->messages());
+    }
+
     public function testMalformedXmlIsReported(): void
     {
         $result = (new XsdValidator())->validate('<Invoice><a>Pérez & Cía</a></Invoice>');

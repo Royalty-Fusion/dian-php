@@ -2,57 +2,68 @@
 
 ## ¿Cuándo emitirlo?
 
-Cuando tu empresa **compra** bienes o servicios a un **proveedor que NO está
-obligado a facturar electrónicamente** (típicamente personas naturales por
-debajo del umbral de la UVT). Tu empresa toma el rol de emisor del DS frente
-a DIAN para soportar el costo/gasto y el IVA descontable.
+Cuando su empresa **compra** bienes o servicios a un proveedor **no obligado a
+facturar** (por ejemplo, personas naturales no responsables de IVA) o a un
+proveedor del exterior. Su empresa genera y firma el documento para soportar
+el costo y el IVA descontable (Resolución DIAN 000167 de 2021).
 
-## Diferencias vs. Factura de Venta
+## Diferencias con la factura de venta
 
-| | Factura de Venta | Documento Soporte |
+| | Factura de venta | Documento soporte |
 |---|---|---|
-| `cbc:CustomizationID` | `10` | `11` |
+| `cbc:CustomizationID` | `10` (tipo de operación) | `10` vendedor residente / `11` no residente |
 | `cbc:InvoiceTypeCode` | `01` | `05` |
 | `cbc:UUID schemeName` | `CUFE-SHA384` | `CUDS-SHA384` |
-| Hash | CUFE | CUDS (algoritmo distinto) |
-| Roles | Emisor=tu empresa, Cliente=adquiriente | Emisor=tu empresa, Cliente=proveedor no obligado |
+| Clave del hash | Clave técnica | PIN del software |
+| `AccountingSupplierParty` | Su empresa | El vendedor no obligado (`setSupplier`) |
+| `AccountingCustomerParty` | El cliente | Su empresa (`setCompany`), que firma |
+| Líneas | — | `cac:InvoicePeriod` con la fecha de compra y la forma de transmisión |
+| Resolución | De facturación | De documento soporte (prefijo y rango propios) |
 
-## Uso mínimo
+## Uso
 
 ```php
-use RoyaltyFusion\DianPhp\SupportDocument\{CudsGenerator, SupportDocument, SupportDocumentBuilder};
-use RoyaltyFusion\DianPhp\Model\{Client, Company, Item, Software, Tax};
+use RoyaltyFusion\DianPhp\SupportDocument\SupportDocument;
 
 $ds = (new SupportDocument())
     ->setPrefijo('DS')->setNumero('1')
-    ->setFecha(new DateTimeImmutable('now'))
-    ->setCompany($miEmpresa)        // tu empresa = emisor
-    ->setSupplier($proveedor)        // persona no obligada
+    ->setFecha(new DateTimeImmutable())
+    ->setCompany($miEmpresa)                 // adquiriente, emite y firma
+    ->setSupplier($vendedor)                 // Client: persona no obligada
     ->setSoftware($software)
-    ->setTotal(59500.0)
-    ->addItem($item)
-    ->addTax($iva);
+    ->setResolution($resolucionDs)
+    ->addPayment((new Payment())->setMethodId('1')->setMeansId('10'))
+    ->addItem((new Item())->setDescripcion('Servicio de transporte')->setCantidad(1)->setPrecio(500000));
 
-$cuds = (new CudsGenerator())->generate($ds, $software->getPin(), CudsGenerator::ENV_HABILITACION);
-$xml  = (new SupportDocumentBuilder())->build($ds, $cuds, $qrUrl);
+$ds->setCustomizationId(SupportDocument::NO_RESIDENTE);                 // vendedor del exterior
+$ds->setTransmissionCode(SupportDocument::TRANSMISION_ACUMULADO_SEMANAL); // compras acumuladas
+
+$report = $dian->preflight($ds);              // mismas validaciones que la factura
+$result = $dian->sendSupportDocument($ds);
 ```
 
-Ver `examples/support-document.php` para el ejemplo completo ejecutable.
+## Nota de ajuste (tipo 95)
 
-## Algoritmo CUDS
+```php
+use RoyaltyFusion\DianPhp\SupportDocument\SupportDocumentAdjustmentNote;
+
+$nota = new SupportDocumentAdjustmentNote();
+$nota->setPrefijo('NA')->setNumero('1')->setFecha(new DateTimeImmutable())
+    ->setCompany($miEmpresa)->setSupplier($vendedor)->setSoftware($software)
+    ->addItem($itemAjustado);
+$nota->setBillingReference((new BillingReference())->setNumber('DS1')->setUuid($cudsOriginal)->setDate($fechaDs));
+$nota->setDiscrepancyResponse((new DiscrepancyResponse())->setResponseCode('2')->setDescription('Anulación'));
+
+$result = $dian->sendSupportDocument($nota);
+```
+
+## CUDS
 
 ```
-CUDS = SHA-384(
-  NumDS + FecDS + HoraDS + ValDS +
-  CodImp1 + ValImp1 + CodImp2 + ValImp2 + CodImp3 + ValImp3 +
-  ValTot + NitOFE + NumAdq + TipoAmb + PinSoftware
-)
+CUDS = SHA-384(NumDS + FecDS + HorDS + ValDS + 01 + ValIva + ValTot
+               + NumDocVendedor + NitAdquiriente + PinSoftware + TipoAmbiente)
 ```
 
-Mismo patrón que CUFE pero con el ambiente entre los datos del receptor y el PIN.
-
-## Pendiente
-
-* **Nota de Ajuste DS** (TipoDocumento=95) — modelo y template aún sin
-  implementar. El emisor también es tu empresa; se referencia el CUDS del
-  DS original.
+`CudsGenerator::buildString()` devuelve la cadena previa al hash. El documento
+y la nota de ajuste generados validan contra el XSD UBL 2.1 + DIAN; la fórmula
+del CUDS debe confirmarse en el set de pruebas del documento soporte.

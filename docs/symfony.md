@@ -1,7 +1,7 @@
 # Integración con Symfony
 
 El SDK incluye un bundle plug-and-play en `src/Bridge/Symfony/` que registra todos los
-servicios en el container y expone el comando `dian:status`.
+servicios en el container y expone los comandos `dian:doctor` y `dian:status`.
 
 ## 1. Activar el bundle
 
@@ -19,7 +19,9 @@ return [
 # config/packages/dian.yaml
 dian:
   environment: '%env(DIAN_ENV)%'   # habilitacion | produccion
-  validate_before_send: true
+  nit: '%env(DIAN_NIT)%'           # NIT del facturador, usado por dian:doctor
+  signer_role: supplier            # 'third party' si firma un proveedor tecnológico
+  validate_before_send: true       # preflight automático antes de cada envío
   certificate:
     path: '%env(DIAN_CERT_PATH)%'
     password: '%env(DIAN_CERT_PASSWORD)%'
@@ -27,6 +29,7 @@ dian:
     id: '%env(DIAN_SOFT_ID)%'
     pin: '%env(DIAN_SOFT_PIN)%'
     provider_nit: '%env(DIAN_SOFT_PROVIDER_NIT)%'
+    provider_code: '000'           # PPP del nombre de archivo
   report:
     logo_url: '/img/logo.png'
     accent_color: '#1e3a8a'
@@ -74,9 +77,14 @@ final class InvoiceController extends AbstractController
 ## 4. Comandos de consola
 
 ```bash
-bin/console dian:status <cufe>            # consultar
+bin/console dian:doctor                   # entorno, certificado y GetNumberingRange firmado
+bin/console dian:status <cufe|zipKey>     # consultar
 bin/console dian:status <cufe> --zip      # + ApplicationResponse XML
 ```
+
+Las consultas usan el certificado configurado para la cabecera WS-Security.
+Si la aplicación tiene un logger (Monolog), el cliente SOAP lo recibe
+automáticamente.
 
 ## 5. Eventos (próximas versiones)
 

@@ -7,7 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Pending after 0.1.1
+Hace que el flujo completo funcione: antes la firma fallaba siempre y la DIAN
+habría rechazado los documentos por CUFE y por falta de WS-Security.
+
+### Fixed
+
+- **Firma XAdES**: `XadesSigner` lanzaba `ArgumentCountError` en cada firma y
+  el hash de la política DIAN era inválido. Reescrito con las 3 referencias de
+  los documentos aprobados (documento, KeyInfo, SignedProperties); verificado
+  contra las firmas reales de `resources/fixtures` y con signxml.
+- **Escape XML**: los textos con `&`, `<` o comillas rompían el XML (y permitían
+  inyectar nodos). Todas las plantillas escapan ahora por defecto.
+- **CUFE**: usaba `cantidad × precio` sin descuentos y el `setTotal()` del
+  usuario; ahora usa los mismos totales del XML. Reproduce el ejemplo oficial
+  del Anexo. CUDE sin `TipoDoc`. CUDS según el anexo del documento soporte.
+- **Estructura UBL**: orden de elementos según el XSD en factura, notas y
+  líneas (`PaymentExchangeRate`, `PostalZone`, `BrandName`, retenciones y
+  anticipos en notas). Todos los documentos generados validan contra UBL 2.1.
+- `InvoiceTypeCode`, `CustomizationID`, `ProfileExecutionID` y `UUID@schemeID`
+  dinámicos (antes fijos: exportación, contingencia y RADIAN en producción eran
+  imposibles); DV del adquiriente y del proveedor tecnológico; hora en -05:00.
+- Documento soporte: roles de vendedor/adquiriente, residente/no residente,
+  control de numeración y periodo por línea.
+- RADIAN: `DianExtensions` y ambiente dinámico.
+- Nómina: namespace `NominaIndividual` en todo el documento.
+- Catálogo `Tributo` alineado con la tabla DIAN (25, 34 y 35 tenían otro significado).
+- Bundle Symfony: el XML recibía `habilitacion` como ambiente en vez de `2`.
+- PHPStan nivel 6 sin errores (el CI fallaba desde antes).
+
+### Added
+
+- **WS-Security + WS-Addressing** en todas las llamadas (`WsSecurity`).
+- `SoapClient` reescrito: ZIP en todos los envíos, nombres de archivo del
+  Anexo, `DianResponse` (rechazos, notificaciones, SOAP Fault, ZipKey,
+  ApplicationResponse), reintentos con espera exponencial, PSR-3, `call()`.
+- **Preflight**: `Dian::preflight()` y validación automática en `send()` con
+  `BusinessRuleValidator` (~60 reglas), `CertificateChecker`, `XsdValidator`,
+  `SignatureVerifier` y `XmlConsistencyChecker`.
+- XSD de UBL 2.1 + DIAN + XAdES incluidos en `resources/xsd`.
+- `vendor/bin/dian-doctor` y comando `dian:doctor`.
+- Facade: `sendSupportDocument()`, `sendPayroll()`, `sendEvent()`,
+  `waitForResult()`, `getNumberingRanges()`, `buildAttachedDocument()`.
+- Nota de ajuste al documento soporte; `EventCudeGenerator`; QR completo.
+- `Certificate` (PKCS#12/PEM, aviso de cifrado heredado con OpenSSL 3).
+- Guía de integración (`docs/integration-guide.md`).
+
+### Changed
+
+- `validateBeforeSend` está activo por defecto.
+- `send()` sin TestSetId usa `SendBillSync` (antes `SendBillAsync`).
+- Los impuestos del documento se agregan desde las líneas cuando no se indican;
+  el valor del tributo se calcula si se omite.
+- Descuentos/cargos globales y anticipos afectan el valor a pagar, no la base.
+- `getAcquirer(tipo, número)` y `getExchangeEmails()` cambian de parámetros.
+- `robrichards/xmlseclibs` deja de ser dependencia; se agrega `psr/log`.
 
 ## [0.1.1] - 2026-05-31
 
@@ -43,14 +96,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ❌ RADIAN events — no real event XML available yet
 
 Tests: **89 / 429 assertions** green (was 79/321 in v0.1.0).
-
-### Pending after 0.1.0
-- WS-Security `BinarySecurityToken` for production `SendBillSync` (header-level
-  signature). Habilitación works without WSSE; Producción may require it.
-- Golden master tests against real Nómina / DS / RADIAN XMLs (waiting for fixtures).
-- Retry middleware with exponential backoff for VPFE 5xx errors.
-- PSR-3 `LoggerInterface` injection into `SoapClient`.
-- Symfony bundle event subscribers (`PreSendEvent`, `PostSendEvent`, `ValidationFailedEvent`).
 
 ## [0.1.0] - 2026-05-31
 

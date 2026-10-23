@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace RoyaltyFusion\DianPhp;
 
 use Psr\Log\LoggerInterface;
+use RoyaltyFusion\DianPhp\AttachedDocument\AttachedDocument;
+use RoyaltyFusion\DianPhp\AttachedDocument\AttachedDocumentBuilder;
 use RoyaltyFusion\DianPhp\Model\CreditNote;
 use RoyaltyFusion\DianPhp\Model\DebitNote;
 use RoyaltyFusion\DianPhp\Model\Invoice;
@@ -375,6 +377,44 @@ class Dian
         } catch (\Throwable $th) {
             return Result::failure($th->getMessage());
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Entrega al adquiriente
+    // ------------------------------------------------------------------
+
+    /**
+     * Signed AttachedDocument (XML del documento + ApplicationResponse de la
+     * DIAN) to deliver to the buyer together with the PDF.
+     */
+    public function buildAttachedDocument(Invoice|CreditNote|DebitNote $document, Result $result): string
+    {
+        if (!$result->isSuccess()) {
+            throw new \LogicException('Solo se entrega al adquiriente un documento validado por la DIAN.');
+        }
+        $client = $document->getClient();
+        $company = $document->getCompany();
+        if ($client === null || $company === null) {
+            throw new \LogicException('El documento no tiene emisor o adquiriente.');
+        }
+
+        $attached = (new AttachedDocument())
+            ->setId($result->getCufe())
+            ->setIssueDate(new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota')))
+            ->setParentDocumentId($document->getPrefijo() . $document->getNumero())
+            ->setSender($company)
+            ->setReceiver($client)
+            ->setSignedInvoiceXml($result->getSignedXml())
+            ->setApplicationResponseXml($result->getApplicationResponseXml())
+            ->setProfileExecutionId($this->getEnvironmentCode());
+
+        return $this->signer()->sign((new AttachedDocumentBuilder())->build($attached));
+    }
+
+    /** Signs any UBL document (e.g. one built manually) with the configured certificate. */
+    public function signXml(string $xml): string
+    {
+        return $this->signer()->sign($xml);
     }
 
     // ------------------------------------------------------------------

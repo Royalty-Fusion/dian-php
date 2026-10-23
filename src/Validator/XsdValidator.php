@@ -75,6 +75,9 @@ final class XsdValidator
 
         if (!$valid) {
             foreach (libxml_get_errors() as $error) {
+                if (self::isLibxmlIntegerLimit($error->message)) {
+                    continue;
+                }
                 $result->add(
                     'XSD_' . str_pad((string) $error->code, 4, '0', STR_PAD_LEFT),
                     self::humanize(trim($error->message)),
@@ -129,6 +132,17 @@ final class XsdValidator
         $real = realpath($path) ?: $path;
 
         return 'file://' . (str_starts_with($real, '/') ? '' : '/') . str_replace(['\\', ' '], ['/', '%20'], $real);
+    }
+
+    /**
+     * libxml validates xs:integer with a fixed precision (about 24 digits), but
+     * certificate serial numbers are up to 20 bytes (49 decimal digits) and the
+     * schema allows any integer. Those messages are false positives.
+     */
+    private static function isLibxmlIntegerLimit(string $message): bool
+    {
+        return str_contains($message, 'X509SerialNumber')
+            && preg_match("/'(\\d{20,})' is not a valid value of the atomic type 'xs:integer'/", $message) === 1;
     }
 
     /** Shortens libxml messages: "{urn:...:CommonBasicComponents-2}ID" → "cbc:ID". */
