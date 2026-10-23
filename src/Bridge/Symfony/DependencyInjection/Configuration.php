@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoyaltyFusion\DianPhp\Bridge\Symfony\DependencyInjection;
 
+use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 
@@ -32,38 +33,30 @@ final class Configuration implements ConfigurationInterface
     public function getConfigTreeBuilder(): TreeBuilder
     {
         $tree = new TreeBuilder('dian');
+        /** @var ArrayNodeDefinition $root Symfony 6.4 types getRootNode() as the generic NodeDefinition */
         $root = $tree->getRootNode();
 
-        $root
-            ->children()
-                ->enumNode('environment')->values(['habilitacion', 'produccion'])->defaultValue('habilitacion')->end()
-                ->booleanNode('validate_before_send')->defaultTrue()->end()
-                ->scalarNode('nit')->defaultValue('')->end()
-                ->enumNode('signer_role')->values(['supplier', 'third party'])->defaultValue('supplier')->end()
-                ->arrayNode('certificate')
-                    ->isRequired()
-                    ->children()
-                        ->scalarNode('path')->isRequired()->end()
-                        ->scalarNode('password')->isRequired()->end()
-                    ->end()
-                ->end()
-                ->arrayNode('software')
-                    ->addDefaultsIfNotSet()
-                    ->children()
-                        ->scalarNode('id')->defaultValue('')->end()
-                        ->scalarNode('pin')->defaultValue('')->end()
-                        ->scalarNode('provider_nit')->defaultValue('')->end()
-                        ->scalarNode('provider_code')->defaultValue('000')->end()
-                    ->end()
-                ->end()
-                ->arrayNode('report')
-                    ->addDefaultsIfNotSet()
-                    ->children()
-                        ->scalarNode('logo_url')->defaultValue('')->end()
-                        ->scalarNode('accent_color')->defaultValue('#1e3a8a')->end()
-                    ->end()
-                ->end()
-            ->end();
+        // One statement per node: Symfony 6.4 types end() loosely, so long
+        // fluent chains do not type-check there.
+        $children = $root->children();
+        $children->enumNode('environment')->values(['habilitacion', 'produccion'])->defaultValue('habilitacion');
+        $children->booleanNode('validate_before_send')->defaultTrue();
+        $children->scalarNode('nit')->defaultValue('');
+        $children->enumNode('signer_role')->values(['supplier', 'third party'])->defaultValue('supplier');
+
+        $certificate = $children->arrayNode('certificate')->isRequired()->children();
+        $certificate->scalarNode('path')->isRequired();
+        $certificate->scalarNode('password')->isRequired();
+
+        $software = $children->arrayNode('software')->addDefaultsIfNotSet()->children();
+        $software->scalarNode('id')->defaultValue('');
+        $software->scalarNode('pin')->defaultValue('');
+        $software->scalarNode('provider_nit')->defaultValue('');
+        $software->scalarNode('provider_code')->defaultValue('000');
+
+        $report = $children->arrayNode('report')->addDefaultsIfNotSet()->children();
+        $report->scalarNode('logo_url')->defaultValue('');
+        $report->scalarNode('accent_color')->defaultValue('#1e3a8a');
 
         return $tree;
     }
