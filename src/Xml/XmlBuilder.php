@@ -31,7 +31,7 @@ class XmlBuilder
      */
     public function __construct(
         ?Environment $twig = null,
-        string $environment = TipoAmbiente::HABILITACION->value,
+        string $environment = '2', // TipoAmbiente::HABILITACION; enum ->value in defaults needs PHP 8.2
         ?string $uuidSchemeId = null
     ) {
         $this->twig         = $twig ?? TwigFactory::create(__DIR__ . '/templates');

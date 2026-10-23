@@ -25,7 +25,8 @@ class ApplicationResponseBuilder
     private Environment $twig;
     private string $environment;
 
-    public function __construct(?Environment $twig = null, string $environment = TipoAmbiente::HABILITACION->value)
+    /** @param string $environment TipoAmbiente value, '2' = habilitación (enum ->value in defaults needs PHP 8.2) */
+    public function __construct(?Environment $twig = null, string $environment = '2')
     {
         $this->twig        = $twig ?? TwigFactory::create(__DIR__ . '/templates');
         $this->environment = $environment;
