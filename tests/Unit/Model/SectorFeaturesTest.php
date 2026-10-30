@@ -53,7 +53,7 @@ final class SectorFeaturesTest extends TestCase
             ->addTax((new Tax())->setCode('22')->setPerUnit(66, 3)));
 
         $totals = DocumentCalculator::totals($invoice);
-        $this->assertSame(198.0, $totals['taxTotalsByCode']['22'] ?? null);
+        $this->assertSame(['22' => 198.0], array_intersect_key($totals['taxTotalsByCode'], ['22' => true]));
         // The per-unit tax does not add to the taxable base (TaxExclusiveAmount).
         $this->assertSame(95000.0 + 30001.0, $totals['taxExclusiveAmount']);
 
