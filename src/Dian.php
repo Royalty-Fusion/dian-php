@@ -7,18 +7,24 @@ namespace RoyaltyFusion\DianPhp;
 use Psr\Log\LoggerInterface;
 use RoyaltyFusion\DianPhp\AttachedDocument\AttachedDocument;
 use RoyaltyFusion\DianPhp\AttachedDocument\AttachedDocumentBuilder;
+use RoyaltyFusion\DianPhp\Model\Company;
 use RoyaltyFusion\DianPhp\Model\CreditNote;
 use RoyaltyFusion\DianPhp\Model\DebitNote;
 use RoyaltyFusion\DianPhp\Model\EquivalentDocument;
 use RoyaltyFusion\DianPhp\Model\Invoice;
 use RoyaltyFusion\DianPhp\Model\Result;
+use RoyaltyFusion\DianPhp\Model\Software;
 use RoyaltyFusion\DianPhp\Payroll\CuneGenerator;
 use RoyaltyFusion\DianPhp\Payroll\PayrollAdjustment;
 use RoyaltyFusion\DianPhp\Payroll\PayrollDocument;
 use RoyaltyFusion\DianPhp\Payroll\PayrollXmlBuilder;
 use RoyaltyFusion\DianPhp\Radian\ApplicationResponseBuilder;
+use RoyaltyFusion\DianPhp\Radian\ApplicationResponseEvent;
 use RoyaltyFusion\DianPhp\Radian\EventCudeGenerator;
 use RoyaltyFusion\DianPhp\Radian\EventDocument;
+use RoyaltyFusion\DianPhp\Reception\Acquirer;
+use RoyaltyFusion\DianPhp\Reception\ReceivedDocument;
+use RoyaltyFusion\DianPhp\Reception\ReceivedDocumentReader;
 use RoyaltyFusion\DianPhp\Signer\Certificate;
 use RoyaltyFusion\DianPhp\Signer\SignatureVerifier;
 use RoyaltyFusion\DianPhp\Signer\XadesSigner;
@@ -404,6 +410,84 @@ class Dian
         } catch (\Throwable $th) {
             return Result::failure($th->getMessage());
         }
+    }
+
+    /**
+     * Sends a RADIAN event answering a received document, e.g.
+     *
+     *   $doc = $dian->receive($attachedXml);
+     *   $dian->acknowledge($doc, ApplicationResponseEvent::acuseRecibo(), 'EV-1', $myCompany, $software);
+     *
+     * Events 032 (recibo del bien) and 033/034 need the person who receives:
+     * pass $person = [id, firstName, familyName, jobTitle, department].
+     *
+     * @param array{0:string,1:string,2:string,3?:string,4?:string}|null $person
+     */
+    public function acknowledge(
+        ReceivedDocument $document,
+        ApplicationResponseEvent $event,
+        string $eventId,
+        Company $receiver,
+        Software $software,
+        ?array $person = null,
+    ): Result {
+        if (!$document->isAddressedTo($receiver->getNit())) {
+            return Result::failure("El documento {$document->number} no está dirigido al NIT {$receiver->getNit()}.");
+        }
+        $eventDocument = $document->toEvent($event, $eventId, $receiver, $software);
+        if ($person !== null) {
+            $eventDocument->setPerson($person[0], $person[1], $person[2], $person[3] ?? '', $person[4] ?? '');
+        } elseif (in_array($event->getCode(), [ApplicationResponseEvent::RECIBO_BIEN_SERVICIO], true)) {
+            return Result::failure('El evento 032 requiere la persona que recibe el bien o servicio ($person).');
+        }
+
+        return $this->sendEvent($eventDocument);
+    }
+
+    // ------------------------------------------------------------------
+    // Recepción de documentos de proveedores
+    // ------------------------------------------------------------------
+
+    /**
+     * Reads a supplier document (AttachedDocument received by email, or the
+     * bare signed XML): data for the ERP, signature check and DIAN approval.
+     * Check $doc->isTrustworthy() and $doc->isAddressedTo($myNit) before
+     * registering the purchase.
+     */
+    public function receive(string $xml, bool $verifySignatures = true): ReceivedDocument
+    {
+        return (new ReceivedDocumentReader($verifySignatures))->read($xml);
+    }
+
+    /**
+     * Downloads a document from the DIAN by its CUFE/CUDE (GetXmlByDocumentKey)
+     * and reads it. Null when the DIAN does not return it.
+     */
+    public function getDocument(string $cufe): ?ReceivedDocument
+    {
+        $xml = $this->getSoapClient()->getXmlByDocumentKey($cufe);
+
+        return $xml === '' ? null : (new ReceivedDocumentReader())->read($xml);
+    }
+
+    /**
+     * Adquiriente registered in the DIAN (name and reception email) — use it
+     * to complete the client's data before invoicing. Null when not found.
+     *
+     * @param string $identificationType 13 cédula, 31 NIT…
+     */
+    public function getAcquirer(string $identificationType, string $identificationNumber): ?Acquirer
+    {
+        $response = $this->getSoapClient()->call('GetAcquirer', [
+            'identificationType'   => $identificationType,
+            'identificationNumber' => $identificationNumber,
+        ]);
+        $name = $response->value('ReceiverName');
+        if ($name === '') {
+            return null;
+        }
+
+        return new Acquirer($identificationType, $identificationNumber, $name, $response->value('ReceiverEmail'));
     }
 
     // ------------------------------------------------------------------

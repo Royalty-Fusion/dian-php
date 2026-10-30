@@ -60,12 +60,16 @@
     {% endif %}
     <cac:DocumentResponse>
         <cac:Response>
+            {% if doc.event and doc.event.rejectionCode %}
+            <cbc:ResponseCode listID="{{ doc.event.rejectionCode }}" name="{{ doc.event.rejectionName }}">{{ doc.event.code }}</cbc:ResponseCode>
+            {% else %}
             <cbc:ResponseCode>{{ doc.event ? doc.event.code : '030' }}</cbc:ResponseCode>
+            {% endif %}
             {% if doc.event and doc.event.description %}<cbc:Description>{{ doc.event.description }}</cbc:Description>{% endif %}
         </cac:Response>
         <cac:DocumentReference>
             <cbc:ID>{{ doc.invoiceId }}</cbc:ID>
-            <cbc:UUID schemeName="CUFE-SHA384">{{ doc.invoiceCufe }}</cbc:UUID>
+            <cbc:UUID schemeName="{{ doc.invoiceUuidSchemeName }}">{{ doc.invoiceCufe }}</cbc:UUID>
             {% if doc.invoiceDate %}<cbc:IssueDate>{{ doc.invoiceDate|date('Y-m-d') }}</cbc:IssueDate>{% endif %}
             <cbc:DocumentTypeCode>{{ doc.documentTypeCode }}</cbc:DocumentTypeCode>
         </cac:DocumentReference>

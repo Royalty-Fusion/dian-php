@@ -25,11 +25,8 @@ namespace RoyaltyFusion\DianPhp\Radian;
  *   042  Pago de la factura
  *   045  Avales
  *
- * TODO (Phase 8 follow-up):
- *   - ApplicationResponse Twig template
- *   - ApplicationResponseSigner (separate cert from the supplier's)
- *   - RadianSoapClient.sendEventUpdateStatus()
- *   - Listener helpers to flag transitions on the linked Invoice
+ * Build them with the named constructors (acuseRecibo(), reclamo()…) and send
+ * them with Dian::sendEvent() or, for a received invoice, Dian::acknowledge().
  */
 class ApplicationResponseEvent
 {
@@ -47,9 +44,75 @@ class ApplicationResponseEvent
     public const PAGO                  = '042';
     public const AVALES                = '045';
 
+    /** Conceptos de reclamo (evento 031), cbc:ResponseCode/@listID. */
+    public const RECLAMOS = [
+        '01' => 'Documento con inconsistencias',
+        '02' => 'Mercancía no entregada totalmente',
+        '03' => 'Mercancía no entregada parcialmente',
+        '04' => 'Servicio no prestado',
+    ];
+
+    private const DESCRIPTIONS = [
+        self::ACUSE_RECIBO         => 'Acuse de recibo de Factura Electrónica de Venta',
+        self::RECLAMO              => 'Reclamo de la Factura Electrónica de Venta',
+        self::RECIBO_BIEN_SERVICIO => 'Recibo del bien y/o prestación del servicio',
+        self::ACEPTACION_EXPRESA   => 'Aceptación expresa',
+        self::ACEPTACION_TACITA    => 'Aceptación tácita',
+    ];
+
     private string $code = '';
     private string $cufe = '';
     private string $description = '';
+    private string $rejectionCode = '';
+
+    public function __construct(string $code = '', string $description = '')
+    {
+        $this->code        = $code;
+        $this->description = $description !== '' ? $description : (self::DESCRIPTIONS[$code] ?? '');
+    }
+
+    public static function acuseRecibo(): self
+    {
+        return new self(self::ACUSE_RECIBO);
+    }
+
+    /** @param string $concepto key of RECLAMOS (01..04) */
+    public static function reclamo(string $concepto): self
+    {
+        if (!isset(self::RECLAMOS[$concepto])) {
+            throw new \InvalidArgumentException("Concepto de reclamo '{$concepto}' inválido (01, 02, 03, 04).");
+        }
+        $event = new self(self::RECLAMO);
+        $event->rejectionCode = $concepto;
+
+        return $event;
+    }
+
+    public static function reciboBienServicio(): self
+    {
+        return new self(self::RECIBO_BIEN_SERVICIO);
+    }
+
+    public static function aceptacionExpresa(): self
+    {
+        return new self(self::ACEPTACION_EXPRESA);
+    }
+
+    public static function aceptacionTacita(): self
+    {
+        return new self(self::ACEPTACION_TACITA);
+    }
+
+    /** Concepto del reclamo (01..04) for event 031. */
+    public function getRejectionCode(): string
+    {
+        return $this->rejectionCode;
+    }
+
+    public function getRejectionName(): string
+    {
+        return self::RECLAMOS[$this->rejectionCode] ?? '';
+    }
 
     public function setCode(string $code): self
     {

@@ -21,6 +21,7 @@ class EventDocument
     private ApplicationResponseEvent $event;
     private string $invoiceCufe = '';          // CUFE of the original invoice
     private string $invoiceId = '';            // FV-123 reference
+    private string $invoiceUuidSchemeName = 'CUFE-SHA384';
     private \DateTimeInterface $invoiceDate;
     private ?Company $receiver = null;         // Party that signs the response
     private ?Client $supplier = null;          // Original issuer of the invoice
@@ -78,6 +79,18 @@ class EventDocument
     public function getInvoiceCufe(): string
     {
         return $this->invoiceCufe;
+    }
+
+    /** CUFE-SHA384 (factura) or CUDE-SHA384 (documento equivalente, notas). */
+    public function setInvoiceUuidSchemeName(string $schemeName): self
+    {
+        $this->invoiceUuidSchemeName = $schemeName;
+        return $this;
+    }
+
+    public function getInvoiceUuidSchemeName(): string
+    {
+        return $this->invoiceUuidSchemeName;
     }
 
     public function setInvoiceId(string $invoiceId): self
