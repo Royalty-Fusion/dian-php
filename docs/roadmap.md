@@ -23,12 +23,14 @@
 | 18 | Pulido: ejemplos + docs + CHANGELOG | ✅ Completo |
 | 21 | Firma XAdES verificada, escape XML, cálculos y CUFE unificados, XSD incluidos | ✅ |
 | 22 | WS-Security, cliente SOAP robusto, preflight, `dian-doctor`, guía de integración | ✅ |
+| 23 | Nómina de ajuste, documento equivalente POS, referencias múltiples, impuestos por unidad, mandatos, exportación, sector salud | ✅ |
+| 24 | Recepción de documentos de proveedores, eventos 030–033, consulta de documentos y adquirientes, consecutivos | ✅ |
 
 ## Próximos hitos
 
-* Confirmar en habilitación real: WS-Security, CUDS, CUDE de eventos RADIAN y nómina.
-* Nómina de ajuste (`TipoXML=103`) y XSD de nómina para validación local.
-* Golden masters de documento soporte, nota débito, nómina y eventos RADIAN reales.
-* Facturas del sector salud y otros anexos sectoriales.
+* Confirmar en habilitación real: WS-Security, CUDS, CUDE de eventos RADIAN, nómina y documento equivalente POS.
+* XSD de nómina para validación local.
+* Golden masters de documento soporte, nota débito, nómina, POS y eventos RADIAN reales.
+* Campos específicos de los documentos equivalentes distintos de POS (cine, peajes, transporte aéreo…).
 * Eventos del bundle Symfony (`PreSendEvent`, `PostSendEvent`, `ValidationFailedEvent`).
 * Paquete de integración nativo para Laravel (hoy: ejemplo en la guía).

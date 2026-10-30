@@ -41,6 +41,28 @@ $creditNote = (new CreditNote())
 $dian->send($creditNote);
 ```
 
+### Una nota para varias facturas
+
+```php
+$creditNote
+    ->addBillingReference((new BillingReference())->setNumber('FV100')->setUuid($cufe100)->setDate($fecha100))
+    ->addBillingReference((new BillingReference())->setNumber('FV101')->setUuid($cufe101)->setDate($fecha101));
+```
+
+`setBillingReference()` reemplaza la lista por una sola factura;
+`getBillingReferences()` devuelve todas.
+
+### Ajuste a un documento equivalente (POS)
+
+```php
+$creditNote->setAjusteDocumentoEquivalente(true)   // CreditNoteTypeCode 94 (débito: 93)
+    ->setBillingReference((new BillingReference())
+        ->setNumber('POS1001')->setUuid($cudePos)->setDate($fechaPos)
+        ->setUuidSchemeName('CUDE-SHA384'));
+```
+
+Ver [documento equivalente](./equivalent-document.md).
+
 ### Nota Crédito sin referencia
 
 Si **no conoces el CUFE original** (por ejemplo factura impresa antigua),

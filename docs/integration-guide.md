@@ -308,6 +308,19 @@ if ($result->isSuccess()) {
 
 Ver [AttachedDocument](./attached-document.md) y [representación gráfica](./report.md).
 
+### Otros documentos
+
+* **POS y documentos equivalentes**: [documento equivalente](./equivalent-document.md).
+* **Nómina y notas de ajuste de nómina**: [nómina](./payroll.md).
+* **Compras a no obligados a facturar**: [documento soporte](./support-document.md).
+* **Exportación, mandatos, AIU, sector salud, impuestos por unidad**: [factura](./invoice.md).
+
+### Facturas de proveedores
+
+Lea las facturas de compra que llegan por correo, verifique firma y
+validación DIAN y respóndalas con los eventos RADIAN (acuse, recibo,
+aceptación o reclamo): [recepción de documentos](./reception.md).
+
 ## 10. Integración por framework
 
 ### PHP puro
@@ -406,8 +419,10 @@ Inyecte `RoyaltyFusion\DianPhp\Dian` donde lo necesite. Comandos:
 
 * **Guarde siempre**: XML firmado, CUFE/CUDE, `ApplicationResponse`,
   `ZipKey`, nombre de archivo y fecha de envío. La DIAN exige conservarlos.
-* **Numeración.** Asigne el número en una transacción de base de datos; nunca
-  reutilice un número ya enviado, aunque haya sido rechazado.
+* **Numeración.** Use `NumberingManager` con `PdoNumberingStore`: asigna el
+  número en una transacción y alerta antes de agotar el rango o de que venza
+  la resolución. Nunca reutilice un número ya enviado, aunque haya sido
+  rechazado. Ver [consecutivos](./numbering.md).
 * **Idempotencia.** Si la llamada se cae por timeout, **consulte primero**
   `$dian->getStatus($cufe)` antes de reenviar. Un documento repetido se
   rechaza como procesado anteriormente.
@@ -487,6 +502,12 @@ Verificado automáticamente en la suite de pruebas:
   documentos reales.
 * **WS-Security**: la firma de la cabecera SOAP se verificó con una
   implementación independiente de C14N exclusivo.
+* **Recepción**: la lectura y la verificación de firmas se prueban con
+  AttachedDocuments reales aprobados por la DIAN (factura nacional, exportación,
+  con retenciones y notas crédito).
+* **POS, referencias, impuestos por unidad, mandatos, exportación y sector
+  salud**: los documentos generados pasan el preflight completo (XSD, firma y
+  recálculo del CUDE/CUFE).
 
 Pendiente de confirmar contra la DIAN en vivo (no hay acceso de red a la DIAN
 desde el entorno de desarrollo del SDK). Ejecute `dian-doctor` y el set de
@@ -495,7 +516,11 @@ pruebas, y reporte cualquier diferencia:
 * Aceptación de la cabecera WS-Security por el servicio de la DIAN.
 * Fórmulas de CUDS (documento soporte) y del CUDE de eventos RADIAN, y la
   estructura de los eventos.
-* Nómina electrónica: no hay XSD de nómina incluido ni documentos reales de
-  referencia.
-* Parámetros de `GetAcquirer` y `GetExchangeEmails`; si su caso difiere,
+* Nómina electrónica y su nota de ajuste: no hay XSD de nómina incluido ni
+  documentos reales de referencia.
+* Documento equivalente POS y los campos de la extensión del sector salud
+  (dependen de la resolución vigente del Ministerio de Salud).
+* Parámetros de `GetAcquirer` y `GetExchangeEmails`, y los nombres de los
+  campos de la respuesta de `GetAcquirer` (`ReceiverName`, `ReceiverEmail`)
+  que lee `Dian::getAcquirer()`; si su caso difiere,
   `SoapClient::call('Operacion', [...])` permite llamar cualquier operación.

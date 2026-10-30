@@ -30,13 +30,36 @@ habría rechazado los documentos por CUFE y por falta de WS-Security.
 - Documento soporte: roles de vendedor/adquiriente, residente/no residente,
   control de numeración y periodo por línea.
 - RADIAN: `DianExtensions` y ambiente dinámico.
-- Nómina: namespace `NominaIndividual` en todo el documento.
+- Nómina: namespace `NominaIndividual` en todo el documento; orden de
+  elementos, atributos y conceptos (horas extra, vacaciones, incapacidades,
+  licencias…) según el esquema DIAN; CUNE con fecha y hora de Colombia.
+- `TipoOperacion` tenía los códigos desplazados: AIU es 09, mandatos 11,
+  transporte 12, cambiario 13, notarios 14, divisas 15/16
+  (`TipoOperacion::MANDATARIOS` queda como alias de `MANDATOS`).
 - Catálogo `Tributo` alineado con la tabla DIAN (25, 34 y 35 tenían otro significado).
 - Bundle Symfony: el XML recibía `habilitacion` como ambiente en vez de `2`.
 - PHPStan nivel 6 sin errores (el CI fallaba desde antes).
 
 ### Added
 
+- **Documento equivalente electrónico** (`EquivalentDocument`, Res. 165/2023):
+  tiquete POS y los demás tipos, CUDE con el PIN, extensiones de fabricante,
+  beneficios del comprador y caja, notas de ajuste 93/94 y
+  `Client::consumidorFinal()`.
+- **Nómina de ajuste** (`PayrollAdjustment`, TipoXML 103): reemplazar o
+  eliminar una nómina; `Dian::sendPayrollAdjustment()`.
+- **Recepción** de documentos de proveedores: `Dian::receive()` (datos,
+  firmas y validación DIAN), `Dian::acknowledge()` con eventos 030–033,
+  `Dian::getDocument()` por CUFE y `Dian::getAcquirer()`.
+- **Consecutivos**: `NumberingManager` con `PdoNumberingStore` o
+  `InMemoryNumberingStore`, alertas de rango y vencimiento.
+- Notas a varias facturas (`addBillingReference()`); referencias de remisión,
+  recepción y contrato.
+- Impuestos de valor fijo por unidad (`Tax::setPerUnit()`), mandatos
+  (`Item::setMandante()`), `Item::addProperty()`, entrega e Incoterm
+  (`Delivery`) y extensión del sector salud (`SectorSalud`).
+- Eventos RADIAN con constructores nombrados y concepto de reclamo (031).
+- Reglas `DEE_001..005`, `NOTE_006`, `INV_004..007`.
 - **WS-Security + WS-Addressing** en todas las llamadas (`WsSecurity`).
 - `SoapClient` reescrito: ZIP en todos los envíos, nombres de archivo del
   Anexo, `DianResponse` (rechazos, notificaciones, SOAP Fault, ZipKey,

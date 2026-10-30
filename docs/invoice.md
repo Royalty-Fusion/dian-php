@@ -104,6 +104,79 @@ $invoice
     );
 ```
 
+Tipos de referencia (se emiten en el orden del esquema UBL):
+
+| Constante | Elemento | Uso |
+|---|---|---|
+| `AdditionalDocumentReference::ORDER` | `cac:OrderReference` | Orden de compra |
+| `AdditionalDocumentReference::DESPATCH` | `cac:DespatchDocumentReference` | Remisión / guía de despacho |
+| `AdditionalDocumentReference::RECEIPT` | `cac:ReceiptDocumentReference` | Recepción de mercancía |
+| `AdditionalDocumentReference::CONTRACT` | `cac:ContractDocumentReference` | Contrato |
+| `AdditionalDocumentReference::ADDITIONAL` | `cac:AdditionalDocumentReference` | Otro documento (`setDocumentTypeCode()`, `setDocumentType()`) |
+
+## Impuestos de valor fijo por unidad
+
+INC a las bolsas plásticas (22), impuesto al consumo de licores o al carbono:
+no tienen base ni tarifa sino un valor por unidad.
+
+```php
+$item->addTax((new Tax())->setCode('22')->setPerUnit(66, 3));   // $66 × 3 bolsas
+```
+
+El XML lleva `BaseUnitMeasure` y `PerUnitAmount` en lugar de `TaxableAmount`
+y `Percent`, y el valor no suma a la base gravable (`TaxExclusiveAmount`).
+
+## Mandatos
+
+Con `TipoOperacion::MANDATOS` (11), cada línea facturada por cuenta de un
+tercero identifica al mandante:
+
+```php
+$invoice->setTipoOperacion(TipoOperacion::MANDATOS);
+$item->setMandante('900123456');          // DV calculado si se omite
+```
+
+`Item::addProperty($nombre, $valor)` agrega `AdditionalItemProperty` (por
+ejemplo los datos del RNDC en transporte de carga).
+
+## Exportación (Incoterm y entrega)
+
+```php
+use RoyaltyFusion\DianPhp\Model\Delivery;
+
+$invoice->setTipoFactura(TipoFactura::EXPORTACION)
+    ->setCurrencyCode('USD')->setExchangeRate(3900.50)
+    ->setDelivery((new Delivery())
+        ->setIncoterm('FOB')                                  // descripción oficial automática
+        ->setDate(new DateTimeImmutable('2026-06-01'))
+        ->setAddress($direccionDeEntrega));
+```
+
+El preflight avisa (`INV_004`) si una exportación no tiene Incoterm y rechaza
+Incoterms inexistentes (`INV_005`).
+
+## Sector salud
+
+La factura de servicios de salud lleva un tipo de operación `SS-*` y la
+extensión de interoperabilidad del Ministerio de Salud. Los campos de cada
+usuario los define la resolución vigente del Ministerio (Res. 506 de 2021 y sus
+modificaciones, como la Res. 2275 de 2023): el SDK no los fija, se pasan con
+su nombre oficial.
+
+```php
+use RoyaltyFusion\DianPhp\Sector\SectorSalud;
+
+$salud = (new SectorSalud('Resolución 2275:2023'))
+    ->addUsuario([
+        'CODIGO_PRESTADOR' => '110010000001',
+        'MODALIDAD_PAGO'   => ['04', 'Pago por evento', 'salud_modalidad_pago.gc'],   // [código, nombre, lista]
+        'NUMERO_CONTRATO'  => 'CT-2026-01',
+        'COPAGO'           => 0,
+    ]);
+
+$invoice->setTipoOperacion(SectorSalud::SS_CUFE)->addExtension($salud->toExtension());
+```
+
 ## Variantes (CustomizationID)
 
 | Tipo | Constante | CustomizationID |

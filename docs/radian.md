@@ -27,9 +27,10 @@ circular como título valor. Cada movimiento se registra como un
 ```php
 use RoyaltyFusion\DianPhp\Radian\{ApplicationResponseBuilder, ApplicationResponseEvent, EventDocument};
 
-$event = (new ApplicationResponseEvent())
-    ->setCode(ApplicationResponseEvent::ACUSE_RECIBO)
-    ->setDescription('Acuse de recibo de la factura electrónica');
+$event = ApplicationResponseEvent::acuseRecibo();
+// también: reciboBienServicio(), aceptacionExpresa(), aceptacionTacita(),
+// reclamo('01'|'02'|'03'|'04')  →  01 inconsistencias, 02 mercancía no entregada
+// totalmente, 03 parcialmente, 04 servicio no prestado
 
 $evento = (new EventDocument())
     ->setId('EVT-001')
@@ -44,6 +45,10 @@ $evento = (new EventDocument())
 
 $xml = (new ApplicationResponseBuilder())->build($evento);
 ```
+
+Para facturas recibidas de proveedores es más simple partir del documento
+recibido: `$dian->acknowledge($recibido, $evento, $id, $miEmpresa, $software)`.
+Ver [recepción de documentos](./reception.md).
 
 ## Diferencias con la factura
 

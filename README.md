@@ -47,7 +47,9 @@ if ($result->isSuccess()) {
 
 | | |
 |---|---|
-| Documentos | Factura de venta (nacional, exportación, contingencia, AIU, mandatos…), nota crédito y débito (con y sin referencia), documento soporte y su nota de ajuste, nómina individual, eventos RADIAN, AttachedDocument |
+| Documentos | Factura de venta (nacional, exportación con Incoterm, contingencia, AIU, mandatos, sector salud…), nota crédito y débito (con o sin referencia, a una o varias facturas), documento equivalente POS y demás tipos con sus notas de ajuste, documento soporte y su nota de ajuste, nómina individual y nota de ajuste, eventos RADIAN, AttachedDocument |
+| Recepción | Lectura de facturas de proveedores (AttachedDocument), verificación de firmas y validación DIAN, eventos 030–033, consulta de documentos por CUFE y de adquirientes |
+| Consecutivos | Numeración atómica por resolución (PDO o memoria) con alertas de rango y vencimiento |
 | Firma | XAdES-EPES con la política DIAN v2, verificada contra firmas de documentos reales aprobados por la DIAN |
 | Web service | Las 14 operaciones de la DIAN con WS-Security y WS-Addressing, ZIP, reintentos, logs PSR-3 y lectura de rechazos, notificaciones y SOAP Faults |
 | Cálculos | Totales, tributos y redondeo según el Anexo; CUFE validado con el ejemplo oficial; CUDE, CUDS, CUNE y CUDE de eventos |
@@ -70,6 +72,9 @@ src/
 ├── SupportDocument/    Documento soporte + nota de ajuste
 ├── Payroll/            Nómina electrónica
 ├── Radian/             Eventos RADIAN
+├── Reception/          Documentos recibidos de proveedores
+├── Numbering/          Consecutivos por resolución
+├── Sector/             Extensiones sectoriales (salud)
 ├── AttachedDocument/   Contenedor para el adquiriente (builder + parser)
 ├── Report/             Representación gráfica HTML
 ├── Tools/              Doctor (diagnóstico)
