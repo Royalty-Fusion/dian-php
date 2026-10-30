@@ -205,4 +205,16 @@ class Invoice
     {
         return $this->invoiceTypeCode;
     }
+
+    /** cbc:ProfileID of the document. */
+    public function getProfileId(): string
+    {
+        return 'DIAN 2.1: Factura Electrónica de Venta';
+    }
+
+    /** cbc:UUID@schemeName: CUFE for invoices, CUDE for documentos equivalentes. */
+    public function getUuidSchemeName(): string
+    {
+        return 'CUFE-SHA384';
+    }
 }

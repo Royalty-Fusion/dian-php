@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace RoyaltyFusion\DianPhp\Payroll;
 
+use RoyaltyFusion\DianPhp\Xml\DocumentCalculator;
+
 /**
  * Generator for the CUNE (Código Único de Nómina Electrónica).
  *
@@ -22,48 +24,34 @@ namespace RoyaltyFusion\DianPhp\Payroll;
  *     Ambiente
  *   )
  *
- * Algorithmic recipe taken from lopezsoft/ubl21dian's SignPayroll::getCUNE()
- * (MIT, credited in CREDITS.md). Implementation is independent — we don't
- * import their code, just follow the same byte-for-byte order which is what
- * DIAN actually validates.
+ * FechaGen/HoraGen are expressed in Colombian time (-05:00). For a nota de
+ * ajuste de eliminación the totals are 0.00 and the worker document is "0".
  */
 final class CuneGenerator
 {
     public function generate(PayrollDocument $doc, string $pinSoftware): string
     {
-        $numero    = $doc->getPrefijo() . $doc->getNumero();
-        $fechaGen  = $doc->getFechaGen() ? $doc->getFechaGen()->format('Y-m-d') : '';
-        $horaGen   = $doc->getFechaGen() ? $doc->getFechaGen()->format('H:i:sP') : '';
+        return hash('sha384', $this->buildString($doc, $pinSoftware));
+    }
 
-        $devTotal  = self::truncate2($doc->getDevengados()->total());
-        $dedTotal  = self::truncate2($doc->getDeducciones()->total());
-        $compTotal = self::truncate2($doc->getComprobanteTotal());
+    /** Pre-image of the hash, useful to compare with what DIAN reports. */
+    public function buildString(PayrollDocument $doc, string $pinSoftware): string
+    {
+        [$fecha, $hora] = DocumentCalculator::issueDateTime($doc->getFechaGen());
+        $eliminacion    = $doc instanceof PayrollAdjustment && $doc->isEliminacion();
 
-        $nitEmpleador = $doc->getEmpleador() ? $doc->getEmpleador()->getNit() : '';
-        $numTrabajador = $doc->getTrabajador() ? $doc->getTrabajador()->getNumeroDocumento() : '0';
+        $f = static fn (float $v): string => number_format(floor(round($v * 100, 4)) / 100, 2, '.', '');
 
-        $base = $numero
-            . $fechaGen
-            . $horaGen
-            . self::formatAmount($devTotal)
-            . self::formatAmount($dedTotal)
-            . self::formatAmount($compTotal)
-            . $nitEmpleador
-            . $numTrabajador
+        return $doc->getPrefijo() . $doc->getNumero()
+            . $fecha
+            . $hora
+            . $f($eliminacion ? 0.0 : $doc->getDevengados()->total())
+            . $f($eliminacion ? 0.0 : $doc->getDeducciones()->total())
+            . $f($eliminacion ? 0.0 : $doc->getComprobanteTotal())
+            . ($doc->getEmpleador()?->getNit() ?? '')
+            . ($eliminacion ? '0' : ($doc->getTrabajador()?->getNumeroDocumento() ?: '0'))
             . $doc->getTipoXML()
             . $pinSoftware
             . $doc->getAmbiente();
-
-        return hash('sha384', $base);
-    }
-
-    private static function truncate2(float $value): float
-    {
-        return floor($value * 100) / 100;
-    }
-
-    private static function formatAmount(float $value): string
-    {
-        return number_format($value, 2, '.', '');
     }
 }

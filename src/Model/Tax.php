@@ -89,4 +89,41 @@ class Tax
     {
         return $this->isRetention;
     }
+
+    private float $perUnitAmount = 0.0;
+    private float $baseUnitMeasure = 0.0;
+    private string $unitCode = '94';
+
+    /**
+     * Tributo de valor fijo por unidad (INC bolsas plásticas 22, impuesto al
+     * consumo de licores, carbono…): valor por unidad × unidades. The tax has
+     * no tarifa ni base gravable; its amount is calculated when not set.
+     */
+    public function setPerUnit(float $amountPerUnit, float $units, string $unitCode = '94'): self
+    {
+        $this->perUnitAmount   = $amountPerUnit;
+        $this->baseUnitMeasure = $units;
+        $this->unitCode        = $unitCode;
+        return $this;
+    }
+
+    public function isPerUnit(): bool
+    {
+        return $this->baseUnitMeasure > 0;
+    }
+
+    public function getPerUnitAmount(): float
+    {
+        return $this->perUnitAmount;
+    }
+
+    public function getBaseUnitMeasure(): float
+    {
+        return $this->baseUnitMeasure;
+    }
+
+    public function getUnitCode(): string
+    {
+        return $this->unitCode;
+    }
 }

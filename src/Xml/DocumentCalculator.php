@@ -36,7 +36,7 @@ final class DocumentCalculator
      * @return array{
      *     issueDate: string,
      *     issueTime: string,
-     *     lines: list<array{lineExtensionAmount: float, taxes: list<array{base:float,amount:float,percent:float,code:string,name:string}>, withholdings: list<array{base:float,amount:float,percent:float,code:string,name:string}>}>,
+     *     lines: list<array{lineExtensionAmount: float, taxes: list<array{base:float,amount:float,percent:float,code:string,name:string,perUnit?:array{amount:float,units:float,unitCode:string}}>, withholdings: list<array{base:float,amount:float,percent:float,code:string,name:string,perUnit?:array{amount:float,units:float,unitCode:string}}>}>,
      *     lineExtensionAmount: float,
      *     taxExclusiveAmount: float,
      *     allowanceTotalAmount: float,
@@ -45,8 +45,8 @@ final class DocumentCalculator
      *     taxInclusiveAmount: float,
      *     payableAmount: float,
      *     taxTotalsByCode: array<string,float>,
-     *     taxGroups: array<string,array{amount:float,subtotals:list<array{base:float,amount:float,percent:float,code:string,name:string}>}>,
-     *     withholdingTaxGroups: array<string,array{amount:float,subtotals:list<array{base:float,amount:float,percent:float,code:string,name:string}>}>
+     *     taxGroups: array<string,array{amount:float,subtotals:list<array{base:float,amount:float,percent:float,code:string,name:string,perUnit?:array{amount:float,units:float,unitCode:string}}>}>,
+     *     withholdingTaxGroups: array<string,array{amount:float,subtotals:list<array{base:float,amount:float,percent:float,code:string,name:string,perUnit?:array{amount:float,units:float,unitCode:string}}>}>
      * }
      */
     public static function totals(Invoice|CreditNote|DebitNote|SupportDocument $doc): array
@@ -69,7 +69,9 @@ final class DocumentCalculator
                     $withholdings[] = $row;
                 } else {
                     $taxes[]     = $row;
-                    $lineTaxable = max($lineTaxable, $row['base']);
+                    if (!isset($row['perUnit'])) {
+                        $lineTaxable = max($lineTaxable, $row['base']);
+                    }
                 }
                 $itemTaxRows[] = [$row, $tax->isRetention()];
             }
@@ -92,10 +94,15 @@ final class DocumentCalculator
         } else {
             $merged = [];
             foreach ($itemTaxRows as [$row, $isRetention]) {
-                $key = ($isRetention ? 'R' : 'T') . $row['code'] . '|' . number_format($row['percent'], 4, '.', '');
+                $key = ($isRetention ? 'R' : 'T') . $row['code'] . '|' . (isset($row['perUnit'])
+                    ? 'U' . number_format($row['perUnit']['amount'], 6, '.', '') . $row['perUnit']['unitCode']
+                    : number_format($row['percent'], 4, '.', ''));
                 if (!isset($merged[$key])) {
                     $merged[$key] = [$row, $isRetention];
                     continue;
+                }
+                if (isset($row['perUnit'], $merged[$key][0]['perUnit'])) {
+                    $merged[$key][0]['perUnit']['units'] += $row['perUnit']['units'];
                 }
                 $merged[$key][0]['base']   = self::round($merged[$key][0]['base'] + $row['base']);
                 $merged[$key][0]['amount'] = self::round($merged[$key][0]['amount'] + $row['amount']);
@@ -197,10 +204,26 @@ final class DocumentCalculator
     }
 
     /**
-     * @return array{base:float,amount:float,percent:float,code:string,name:string}
+     * Per-unit taxes (INC bolsas, licores, carbono…) carry no base nor percent:
+     * the row gets a 'perUnit' entry {amount, units, unitCode} instead.
+     *
+     * @return array{base:float,amount:float,percent:float,code:string,name:string,perUnit?:array{amount:float,units:float,unitCode:string}}
      */
     private static function taxRow(Tax $tax, float $defaultBase): array
     {
+        if ($tax->isPerUnit()) {
+            $amount = $tax->getAmount() != 0.0 ? $tax->getAmount() : $tax->getPerUnitAmount() * $tax->getBaseUnitMeasure();
+
+            return [
+                'base'    => 0.0,
+                'amount'  => self::round($amount),
+                'percent' => 0.0,
+                'code'    => $tax->getCode(),
+                'name'    => $tax->getName() !== '' ? $tax->getName() : self::taxName($tax->getCode()),
+                'perUnit' => ['amount' => $tax->getPerUnitAmount(), 'units' => $tax->getBaseUnitMeasure(), 'unitCode' => $tax->getUnitCode()],
+            ];
+        }
+
         $base   = $tax->getBase() > 0 ? $tax->getBase() : $defaultBase;
         $amount = $tax->getAmount();
         if ($amount == 0.0 && $tax->getPercent() > 0 && $base > 0) {

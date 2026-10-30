@@ -1,9 +1,16 @@
 {#- params: sub, currency -#}
 <cac:TaxSubtotal>
+            {% if sub.perUnit is defined %}
+            <cbc:TaxAmount currencyID="{{ currency }}">{{ sub.amount|money }}</cbc:TaxAmount>
+            <cbc:BaseUnitMeasure unitCode="{{ sub.perUnit.unitCode }}">{{ sub.perUnit.units|money(6) }}</cbc:BaseUnitMeasure>
+            <cbc:PerUnitAmount currencyID="{{ currency }}">{{ sub.perUnit.amount|money }}</cbc:PerUnitAmount>
+            <cac:TaxCategory>
+            {% else %}
             <cbc:TaxableAmount currencyID="{{ currency }}">{{ sub.base|money }}</cbc:TaxableAmount>
             <cbc:TaxAmount currencyID="{{ currency }}">{{ sub.amount|money }}</cbc:TaxAmount>
             <cac:TaxCategory>
                 <cbc:Percent>{{ sub.percent|money }}</cbc:Percent>
+            {% endif %}
                 <cac:TaxScheme>
                     <cbc:ID>{{ sub.code }}</cbc:ID>
                     <cbc:Name>{{ sub.name }}</cbc:Name>

@@ -58,6 +58,23 @@
             <cac:StandardItemIdentification>
                 <cbc:ID schemeID="{{ item.codeScheme }}"{% if agency %} schemeAgencyID="{{ agency }}"{% endif %}>{{ item.code ?: (item.sellersItemIdentification ?: loop.index) }}</cbc:ID>
             </cac:StandardItemIdentification>
+            {% for prop in item.properties %}
+            <cac:AdditionalItemProperty>
+                <cbc:Name>{{ prop.name }}</cbc:Name>
+                <cbc:Value>{{ prop.value }}</cbc:Value>
+            </cac:AdditionalItemProperty>
+            {% endfor %}
+            {% if item.mandanteNit %}
+            <cac:InformationContentProviderParty>
+                <cac:PowerOfAttorney>
+                    <cac:AgentParty>
+                        <cac:PartyIdentification>
+                            <cbc:ID schemeAgencyID="195" schemeAgencyName="CO, DIAN (Dirección de Impuestos y Aduanas Nacionales)" schemeID="{{ item.mandanteDv }}" schemeName="31">{{ item.mandanteNit }}</cbc:ID>
+                        </cac:PartyIdentification>
+                    </cac:AgentParty>
+                </cac:PowerOfAttorney>
+            </cac:InformationContentProviderParty>
+            {% endif %}
         </cac:Item>
         <cac:Price>
             <cbc:PriceAmount currencyID="{{ currency }}">{{ item.precio|money }}</cbc:PriceAmount>

@@ -107,4 +107,20 @@ trait HasRichDocumentFields
     {
         return $this->paymentExchangeRate;
     }
+
+    /** @var list<CustomExtension> */
+    private array $extensions = [];
+
+    /** Extra ext:UBLExtension (sector salud, transporte, documentos equivalentes…). */
+    public function addExtension(CustomExtension $extension): self
+    {
+        $this->extensions[] = $extension;
+        return $this;
+    }
+
+    /** @return list<CustomExtension> */
+    public function getExtensions(): array
+    {
+        return $this->extensions;
+    }
 }

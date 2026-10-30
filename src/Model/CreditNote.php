@@ -16,7 +16,8 @@ class CreditNote
     private Company $company;
     private Client $client;
     private Software $software;
-    private BillingReference $billingReference;
+    /** @var list<BillingReference> */
+    private array $billingReferences = [];
     private DiscrepancyResponse $discrepancyResponse;
 
     /** @var Item[] */
@@ -108,15 +109,30 @@ class CreditNote
         return $this->software ?? null;
     }
 
+    /** Factura corregida. Replaces any reference added before; see addBillingReference(). */
     public function setBillingReference(BillingReference $billingReference): self
     {
-        $this->billingReference = $billingReference;
+        $this->billingReferences = [$billingReference];
         return $this;
     }
 
+    /** One note can correct several invoices: add one reference per invoice. */
+    public function addBillingReference(BillingReference $billingReference): self
+    {
+        $this->billingReferences[] = $billingReference;
+        return $this;
+    }
+
+    /** First referenced invoice (null for notes sin referencia). */
     public function getBillingReference(): ?BillingReference
     {
-        return $this->billingReference ?? null;
+        return $this->billingReferences[0] ?? null;
+    }
+
+    /** @return list<BillingReference> */
+    public function getBillingReferences(): array
+    {
+        return $this->billingReferences;
     }
 
     public function setDiscrepancyResponse(DiscrepancyResponse $discrepancyResponse): self
@@ -196,6 +212,41 @@ class CreditNote
 
     protected function defaultCustomizationId(): string
     {
-        return isset($this->billingReference) ? '20' : '22';
+        return $this->billingReferences !== [] ? '20' : '22';
+    }
+
+    private string $creditNoteTypeCode = '91';
+
+    /**
+     * 91 nota crédito de factura (default), 94 nota de ajuste crédito al
+     * documento equivalente electrónico.
+     */
+    public function setCreditNoteTypeCode(string $code): self
+    {
+        $this->creditNoteTypeCode = $code;
+        return $this;
+    }
+
+    public function getCreditNoteTypeCode(): string
+    {
+        return $this->creditNoteTypeCode;
+    }
+
+    /** Marks the note as nota de ajuste crédito al documento equivalente (94). */
+    public function setAjusteDocumentoEquivalente(bool $enabled = true): self
+    {
+        return $this->setCreditNoteTypeCode($enabled ? '94' : '91');
+    }
+
+    public function isAjusteDocumentoEquivalente(): bool
+    {
+        return $this->creditNoteTypeCode === '94';
+    }
+
+    public function getProfileId(): string
+    {
+        return $this->isAjusteDocumentoEquivalente()
+            ? 'DIAN 2.1: Nota de ajuste crédito al documento equivalente'
+            : 'DIAN 2.1: Nota Crédito de Factura Electrónica de Venta';
     }
 }

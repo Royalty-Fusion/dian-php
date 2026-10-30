@@ -176,4 +176,47 @@ class Item
     {
         return $this->referencePrice;
     }
+
+    private string $mandanteNit = '';
+    private ?int $mandanteDv = null;
+    /** @var list<array{name:string,value:string}> */
+    private array $properties = [];
+
+    /**
+     * Mandato (CustomizationID 11): NIT del mandante por cuenta de quien se
+     * factura esta línea (cac:InformationContentProviderParty).
+     */
+    public function setMandante(string $nit, ?int $dv = null): self
+    {
+        $this->mandanteNit = $nit;
+        $this->mandanteDv  = $dv;
+        return $this;
+    }
+
+    public function getMandanteNit(): string
+    {
+        return $this->mandanteNit;
+    }
+
+    public function getMandanteDv(): ?int
+    {
+        return $this->mandanteNit === '' ? null : ($this->mandanteDv ?? NitDvCalculator::compute($this->mandanteNit));
+    }
+
+    /**
+     * cac:AdditionalItemProperty, e.g. transporte de carga (RNDC):
+     * addProperty('01', $numeroRemesa), addProperty('02', $consecutivoInterno),
+     * addProperty('03', $valorFlete).
+     */
+    public function addProperty(string $name, string|int|float $value): self
+    {
+        $this->properties[] = ['name' => $name, 'value' => (string) $value];
+        return $this;
+    }
+
+    /** @return list<array{name:string,value:string}> */
+    public function getProperties(): array
+    {
+        return $this->properties;
+    }
 }

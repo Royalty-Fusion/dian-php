@@ -8,16 +8,18 @@
             xmlns:xades="http://uri.etsi.org/01903/v1.3.2#"
             xmlns:xades141="http://uri.etsi.org/01903/v1.4.1#">
     {% include '@dian/dian_extensions.xml.twig' with {withControl: false} %}
-    {% include '@dian/document_header.xml.twig' with {schemeName: 'CUDE-SHA384', profileId: 'DIAN 2.1: Nota Crédito de Factura Electrónica de Venta'} %}
-    <cbc:CreditNoteTypeCode>91</cbc:CreditNoteTypeCode>
+    {% include '@dian/document_header.xml.twig' with {schemeName: 'CUDE-SHA384', profileId: doc.profileId} %}
+    <cbc:CreditNoteTypeCode>{{ doc.creditNoteTypeCode }}</cbc:CreditNoteTypeCode>
     {% for note in doc.notes %}
     <cbc:Note>{{ note.text }}</cbc:Note>
     {% endfor %}
     <cbc:DocumentCurrencyCode>{{ currency }}</cbc:DocumentCurrencyCode>
     <cbc:LineCountNumeric>{{ doc.items|length }}</cbc:LineCountNumeric>
     {% include '@dian/note_references.xml.twig' %}
+    {% include '@dian/doc_references.xml.twig' with {types: ['OrderReference', 'BillingReference', 'DespatchDocumentReference', 'ReceiptDocumentReference', 'ContractDocumentReference', 'AdditionalDocumentReference']} %}
     {% if doc.company %}{% include '@dian/company_party.xml.twig' with {c: doc.company, tag: 'cac:AccountingSupplierParty', corporatePrefix: doc.prefijo} only %}{% endif %}
     {% if doc.client %}{% include '@dian/client_party.xml.twig' with {c: doc.client, tag: 'cac:AccountingCustomerParty'} only %}{% endif %}
+    {% include '@dian/delivery.xml.twig' %}
     {% include '@dian/payment_means.xml.twig' %}
     {% if doc.paymentExchangeRate %}{% include '@dian/exchange_rate.xml.twig' with {rate: doc.paymentExchangeRate} %}{% endif %}
     {% for ac in doc.allowanceCharges %}

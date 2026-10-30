@@ -108,11 +108,13 @@ $invoice
 
 | Tipo | Constante | CustomizationID |
 |---|---|---|
+| AIU | `TipoOperacion::AIU` | `09` |
 | Estándar | `TipoOperacion::ESTANDAR` | `10` |
-| AIU | `TipoOperacion::AIU` | `11` |
-| Mandatos | `TipoOperacion::MANDATARIOS` | `12` |
-| Transporte | `TipoOperacion::TRANSPORTE` | `13` |
-| Notarios | `TipoOperacion::NOTARIOS` | `15` |
+| Mandatos | `TipoOperacion::MANDATOS` | `11` |
+| Transporte | `TipoOperacion::TRANSPORTE` | `12` |
+| Cambiario | `TipoOperacion::CAMBIARIO` | `13` |
+| Notarios | `TipoOperacion::NOTARIOS` | `14` |
+| Compra / venta de divisas | `TipoOperacion::COMPRA_DIVISAS` / `VENTA_DIVISAS` | `15` / `16` |
 
 Se selecciona con `$invoice->setTipoOperacion(TipoOperacion::AIU)`; el tipo de
 factura (01 venta, 02 exportación, 03/04 contingencia) con

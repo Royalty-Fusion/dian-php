@@ -42,4 +42,18 @@ class BillingReference
     {
         return $this->date ?? null;
     }
+
+    private string $uuidSchemeName = 'CUFE-SHA384';
+
+    /** CUFE-SHA384 (factura, default) or CUDE-SHA384 (documento equivalente). */
+    public function setUuidSchemeName(string $schemeName): self
+    {
+        $this->uuidSchemeName = $schemeName;
+        return $this;
+    }
+
+    public function getUuidSchemeName(): string
+    {
+        return $this->uuidSchemeName;
+    }
 }

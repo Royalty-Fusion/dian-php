@@ -1,0 +1,8 @@
+{#- Generic node tree renderer: {name, attrs?, text?, children?} -#}
+{% macro node(n) -%}
+{%- import _self as m -%}
+<{{ n.name }}{% for k, v in n.attrs|default({}) %} {{ k }}="{{ v }}"{% endfor %}
+{%- if n.children is defined %}>{% for c in n.children %}{{ m.node(c) }}{% endfor %}</{{ n.name }}>
+{%- elseif n.text is defined %}>{{ n.text }}</{{ n.name }}>
+{%- else %}/>{% endif %}
+{%- endmacro %}

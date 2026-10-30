@@ -11,8 +11,19 @@ namespace RoyaltyFusion\DianPhp\Model;
  */
 class AdditionalDocumentReference
 {
-    /** Use one of: OrderReference, ContractDocumentReference, DespatchDocumentReference, ReceiptDocumentReference */
+    public const ORDER       = 'OrderReference';
+    public const DESPATCH    = 'DespatchDocumentReference';
+    public const RECEIPT     = 'ReceiptDocumentReference';
+    public const CONTRACT    = 'ContractDocumentReference';
+    public const ADDITIONAL  = 'AdditionalDocumentReference';
+
+    /**
+     * OrderReference (orden de compra), DespatchDocumentReference (remisión),
+     * ReceiptDocumentReference (recepción), ContractDocumentReference (contrato)
+     * or AdditionalDocumentReference (otro documento).
+     */
     private string $type = 'OrderReference';
+    private string $documentTypeCode = '';
     private string $id = '';
     private string $documentType = '';
     private \DateTimeInterface $issueDate;
@@ -59,5 +70,17 @@ class AdditionalDocumentReference
     public function getIssueDate(): ?\DateTimeInterface
     {
         return $this->issueDate ?? null;
+    }
+
+    /** cbc:DocumentTypeCode (AdditionalDocumentReference only). */
+    public function setDocumentTypeCode(string $documentTypeCode): self
+    {
+        $this->documentTypeCode = $documentTypeCode;
+        return $this;
+    }
+
+    public function getDocumentTypeCode(): string
+    {
+        return $this->documentTypeCode;
     }
 }

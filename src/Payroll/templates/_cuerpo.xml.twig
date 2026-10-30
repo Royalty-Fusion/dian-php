@@ -1,0 +1,20 @@
+{#- Trabajador … ComprobanteTotal. params: doc, devengados, deducciones, totals -#}
+{% import '@dian/nodes.xml.twig' as n %}
+{% if doc.trabajador %}
+    {% set tra = doc.trabajador %}
+    <Trabajador TipoTrabajador="{{ tra.tipoTrabajador }}" SubTipoTrabajador="{{ tra.subTipoTrabajador }}" AltoRiesgoPension="{{ tra.altoRiesgoPension ? 'true' : 'false' }}" TipoDocumento="{{ tra.tipoDocumento }}" NumeroDocumento="{{ tra.numeroDocumento }}" PrimerApellido="{{ tra.primerApellido }}"{% if tra.segundoApellido %} SegundoApellido="{{ tra.segundoApellido }}"{% endif %} PrimerNombre="{{ tra.primerNombre }}"{% if tra.otrosNombres %} OtrosNombres="{{ tra.otrosNombres }}"{% endif %} LugarTrabajoPais="{{ tra.lugarTrabajoPais }}" LugarTrabajoDepartamentoEstado="{{ tra.lugarTrabajoDepartamentoEstado }}" LugarTrabajoMunicipioCiudad="{{ tra.lugarTrabajoMunicipioCiudad }}" LugarTrabajoDireccion="{{ tra.lugarTrabajoDireccion }}" SalarioIntegral="{{ tra.salarioIntegral ? 'true' : 'false' }}" TipoContrato="{{ tra.tipoContrato }}" Sueldo="{{ tra.sueldo|money }}"{% if tra.codigoTrabajador %} CodigoTrabajador="{{ tra.codigoTrabajador }}"{% endif %}/>
+    {% endif %}
+    {% if doc.pago %}
+    {% set pag = doc.pago %}
+    <Pago Forma="{{ pag.forma }}" Metodo="{{ pag.metodo }}"{% if pag.banco %} Banco="{{ pag.banco }}"{% endif %}{% if pag.tipoCuenta %} TipoCuenta="{{ pag.tipoCuenta }}"{% endif %}{% if pag.numeroCuenta %} NumeroCuenta="{{ pag.numeroCuenta }}"{% endif %}/>
+    {% endif %}
+    <FechasPagos>
+        {% for fecha in doc.fechasPago %}
+        <FechaPago>{{ fecha|date('Y-m-d') }}</FechaPago>
+        {% endfor %}
+    </FechasPagos>
+    <Devengados>{% for node in devengados %}{{ n.node(node) }}{% endfor %}</Devengados>
+    <Deducciones>{% for node in deducciones %}{{ n.node(node) }}{% endfor %}</Deducciones>
+    <DevengadosTotal>{{ totals.devengados }}</DevengadosTotal>
+    <DeduccionesTotal>{{ totals.deducciones }}</DeduccionesTotal>
+    <ComprobanteTotal>{{ totals.comprobante }}</ComprobanteTotal>

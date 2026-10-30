@@ -50,7 +50,7 @@ class QrGenerator
         $f      = static fn (float $v): string => number_format($v, 2, '.', '');
         $iva    = $totals['taxTotalsByCode']['01'] ?? 0.0;
         $others = array_sum($totals['taxTotalsByCode']) - $iva;
-        $label  = $doc instanceof Invoice ? 'CUFE' : 'CUDE';
+        $label  = $doc instanceof Invoice ? substr($doc->getUuidSchemeName(), 0, 4) : 'CUDE';
 
         return implode("\n", [
             'NumFac:' . $doc->getPrefijo() . $doc->getNumero(),

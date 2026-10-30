@@ -1,0 +1,25 @@
+{#- Document references in UBL order. params: doc, types (list of reference tags), withBilling (notes) -#}
+{% for type in types %}
+    {% if type == 'BillingReference' %}
+    {% for br in doc.billingReferences %}
+    <cac:BillingReference>
+        <cac:InvoiceDocumentReference>
+            <cbc:ID>{{ br.number }}</cbc:ID>
+            <cbc:UUID schemeName="{{ br.uuidSchemeName }}">{{ br.uuid }}</cbc:UUID>
+            <cbc:IssueDate>{{ br.date|date('Y-m-d') }}</cbc:IssueDate>
+        </cac:InvoiceDocumentReference>
+    </cac:BillingReference>
+    {% endfor %}
+    {% else %}
+    {% for ref in doc.additionalDocumentReferences|filter(r => r.type == type) %}
+    <cac:{{ type }}>
+        <cbc:ID>{{ ref.id }}</cbc:ID>
+        {% if ref.issueDate %}<cbc:IssueDate>{{ ref.issueDate|date('Y-m-d') }}</cbc:IssueDate>{% endif %}
+        {% if type != 'OrderReference' %}
+        {% if ref.documentTypeCode %}<cbc:DocumentTypeCode>{{ ref.documentTypeCode }}</cbc:DocumentTypeCode>{% endif %}
+        {% if ref.documentType %}<cbc:DocumentType>{{ ref.documentType }}</cbc:DocumentType>{% endif %}
+        {% endif %}
+    </cac:{{ type }}>
+    {% endfor %}
+    {% endif %}
+{% endfor %}

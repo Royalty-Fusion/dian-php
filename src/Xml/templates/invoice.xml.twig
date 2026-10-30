@@ -8,7 +8,7 @@
          xmlns:xades="http://uri.etsi.org/01903/v1.3.2#"
          xmlns:xades141="http://uri.etsi.org/01903/v1.4.1#">
     {% include '@dian/dian_extensions.xml.twig' with {withControl: true} %}
-    {% include '@dian/document_header.xml.twig' with {schemeName: 'CUFE-SHA384', profileId: 'DIAN 2.1: Factura Electrónica de Venta'} %}
+    {% include '@dian/document_header.xml.twig' with {schemeName: doc.uuidSchemeName, profileId: doc.profileId} %}
     {% if doc.dueDate %}<cbc:DueDate>{{ doc.dueDate|date('Y-m-d') }}</cbc:DueDate>{% endif %}
     <cbc:InvoiceTypeCode>{{ doc.invoiceTypeCode }}</cbc:InvoiceTypeCode>
     {% for note in doc.notes %}
@@ -22,22 +22,10 @@
         <cbc:EndDate>{{ doc.invoicePeriodEnd|date('Y-m-d') }}</cbc:EndDate>
     </cac:InvoicePeriod>
     {% endif %}
-    {% for ref in doc.additionalDocumentReferences|filter(r => r.type == 'OrderReference') %}
-    <cac:OrderReference>
-        <cbc:ID>{{ ref.id }}</cbc:ID>
-        {% if ref.issueDate %}<cbc:IssueDate>{{ ref.issueDate|date('Y-m-d') }}</cbc:IssueDate>{% endif %}
-    </cac:OrderReference>
-    {% endfor %}
-    {% for ref in doc.additionalDocumentReferences|filter(r => r.type == 'AdditionalDocumentReference') %}
-    <cac:AdditionalDocumentReference>
-        <cbc:ID>{{ ref.id }}</cbc:ID>
-        {% if ref.issueDate %}<cbc:IssueDate>{{ ref.issueDate|date('Y-m-d') }}</cbc:IssueDate>{% endif %}
-        {% if ref.documentTypeCode is defined and ref.documentTypeCode %}<cbc:DocumentTypeCode>{{ ref.documentTypeCode }}</cbc:DocumentTypeCode>{% endif %}
-        {% if ref.documentType %}<cbc:DocumentType>{{ ref.documentType }}</cbc:DocumentType>{% endif %}
-    </cac:AdditionalDocumentReference>
-    {% endfor %}
+    {% include '@dian/doc_references.xml.twig' with {types: ['OrderReference', 'DespatchDocumentReference', 'ReceiptDocumentReference', 'ContractDocumentReference', 'AdditionalDocumentReference']} %}
     {% if doc.company %}{% include '@dian/company_party.xml.twig' with {c: doc.company, tag: 'cac:AccountingSupplierParty', corporatePrefix: doc.prefijo} only %}{% endif %}
     {% if doc.client %}{% include '@dian/client_party.xml.twig' with {c: doc.client, tag: 'cac:AccountingCustomerParty'} only %}{% endif %}
+    {% include '@dian/delivery.xml.twig' %}
     {% include '@dian/payment_means.xml.twig' %}
     {% for prepayment in doc.prepayments %}
     <cac:PrepaidPayment>

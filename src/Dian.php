@@ -9,9 +9,11 @@ use RoyaltyFusion\DianPhp\AttachedDocument\AttachedDocument;
 use RoyaltyFusion\DianPhp\AttachedDocument\AttachedDocumentBuilder;
 use RoyaltyFusion\DianPhp\Model\CreditNote;
 use RoyaltyFusion\DianPhp\Model\DebitNote;
+use RoyaltyFusion\DianPhp\Model\EquivalentDocument;
 use RoyaltyFusion\DianPhp\Model\Invoice;
 use RoyaltyFusion\DianPhp\Model\Result;
 use RoyaltyFusion\DianPhp\Payroll\CuneGenerator;
+use RoyaltyFusion\DianPhp\Payroll\PayrollAdjustment;
 use RoyaltyFusion\DianPhp\Payroll\PayrollDocument;
 use RoyaltyFusion\DianPhp\Payroll\PayrollXmlBuilder;
 use RoyaltyFusion\DianPhp\Radian\ApplicationResponseBuilder;
@@ -223,6 +225,9 @@ class Dian
             }
 
             $type     = match (true) {
+                $document instanceof EquivalentDocument => FileNameGenerator::forEquivalentDocument($document->getTipo()),
+                $document instanceof CreditNote && $document->isAjusteDocumentoEquivalente() => FileNameGenerator::forEquivalentDocument('94'),
+                $document instanceof DebitNote && $document->isAjusteDocumentoEquivalente()  => FileNameGenerator::forEquivalentDocument('93'),
                 $document instanceof Invoice    => FileNameGenerator::FACTURA,
                 $document instanceof CreditNote => FileNameGenerator::NOTA_CREDITO,
                 default                         => FileNameGenerator::NOTA_DEBITO,
@@ -340,13 +345,10 @@ class Dian
     public function sendPayroll(PayrollDocument $document, string $testSetId = ''): Result
     {
         try {
-            $document->setAmbiente($this->getEnvironmentCode());
-            $pin  = $document->getSoftware()?->getPin() ?? '';
-            $cune = (new CuneGenerator())->generate($document, $pin);
-            $xml  = (new PayrollXmlBuilder())->build($document, $cune, QrGenerator::url($cune, $this->isProduction()));
-            $signed = $this->signer()->sign($xml);
+            [$cune, $signed] = $this->buildSignedPayroll($document);
 
-            $fileName = FileNameGenerator::base(FileNameGenerator::NOMINA, $document->getEmpleador()?->getNit() ?? '', $document->getConsecutivo(), $document->getFechaGen(), $this->providerCode);
+            $type     = $document instanceof PayrollAdjustment ? FileNameGenerator::NOMINA_AJUSTE : FileNameGenerator::NOMINA;
+            $fileName = FileNameGenerator::base($type, $document->getEmpleador()?->getNit() ?? '', $document->getConsecutivo(), $document->getFechaGen(), $this->providerCode);
             if (!$this->isProduction() && $testSetId !== '') {
                 return $this->getSoapClient()->sendTestSetAsync($fileName, $signed, $testSetId, $cune);
             }
@@ -355,6 +357,31 @@ class Dian
         } catch (\Throwable $th) {
             return Result::failure($th->getMessage());
         }
+    }
+
+    /**
+     * Nota de ajuste de nómina (reemplazar o eliminar una nómina ya validada).
+     * Same flow as sendPayroll(); kept as its own method for readability.
+     */
+    public function sendPayrollAdjustment(PayrollAdjustment $adjustment, string $testSetId = ''): Result
+    {
+        return $this->sendPayroll($adjustment, $testSetId);
+    }
+
+    /** Signed nómina / nota de ajuste XML without sending it. */
+    public function getSignedPayroll(PayrollDocument $document): string
+    {
+        return $this->buildSignedPayroll($document)[1];
+    }
+
+    /** @return array{string,string} [cune, signedXml] */
+    private function buildSignedPayroll(PayrollDocument $document): array
+    {
+        $document->setAmbiente($this->getEnvironmentCode());
+        $cune = (new CuneGenerator())->generate($document, $document->getSoftware()?->getPin() ?? '');
+        $xml  = (new PayrollXmlBuilder())->build($document, $cune, QrGenerator::url($cune, $this->isProduction()));
+
+        return [$cune, $this->signer()->sign($xml)];
     }
 
     // ------------------------------------------------------------------
@@ -476,7 +503,8 @@ class Dian
 
     private function keyOrPin(Invoice|CreditNote|DebitNote $document): string
     {
-        return $document instanceof Invoice
+        // Factura: clave técnica (CUFE). Notas y documentos equivalentes: PIN (CUDE).
+        return $document instanceof Invoice && !$document instanceof EquivalentDocument
             ? $document->getTechnicalKey()
             : ($document->getSoftware()?->getPin() ?? '');
     }

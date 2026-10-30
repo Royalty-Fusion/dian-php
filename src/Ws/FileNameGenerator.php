@@ -28,6 +28,17 @@ final class FileNameGenerator
     public const EVENTO         = 'ar';
     public const ADJUNTO        = 'ad';
 
+    /** File prefix of each documento equivalente (and its notas de ajuste). */
+    private const EQUIVALENT_PREFIXES = [
+        '20' => 'pos', '25' => 'cin', '27' => 'esp', '30' => 'jue', '35' => 'ttr', '40' => 'pjs',
+        '45' => 'ext', '50' => 'tae', '55' => 'bls', '60' => 'srv', '93' => 'ndq', '94' => 'ncq',
+    ];
+
+    public static function forEquivalentDocument(string $tipo): string
+    {
+        return self::EQUIVALENT_PREFIXES[$tipo] ?? 'dee';
+    }
+
     /**
      * Base name without extension (e.g. "fv0900123456000260000002a").
      *

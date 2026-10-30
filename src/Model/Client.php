@@ -124,4 +124,23 @@ class Client
     {
         return $this->commercialName;
     }
+
+    /** Identificación usada por la DIAN para ventas al consumidor final. */
+    public const CONSUMIDOR_FINAL = '222222222222';
+
+    /** Adquiriente "consumidor final" for POS and other sales without identification. */
+    public static function consumidorFinal(): self
+    {
+        return (new self())
+            ->setTipoDocumento('13')
+            ->setNumeroDocumento(self::CONSUMIDOR_FINAL)
+            ->setRazonSocial('Consumidor final')
+            ->setTipoOrganizacion('2')
+            ->setResponsabilidades('R-99-PN');
+    }
+
+    public function isConsumidorFinal(): bool
+    {
+        return $this->getNumeroDocumento() === self::CONSUMIDOR_FINAL;
+    }
 }

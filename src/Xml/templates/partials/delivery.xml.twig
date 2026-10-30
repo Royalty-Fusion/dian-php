@@ -1,0 +1,17 @@
+{#- Delivery + DeliveryTerms (exportaciones). params: doc -#}
+{% if doc.delivery %}
+    {% set d = doc.delivery %}
+    {% if d.date or d.address %}
+    <cac:Delivery>
+        {% if d.date %}<cbc:ActualDeliveryDate>{{ d.date|date('Y-m-d') }}</cbc:ActualDeliveryDate>{% endif %}
+        {% if d.address %}{% include '@dian/address.xml.twig' with {address: d.address, tag: 'cac:DeliveryAddress'} only %}{% endif %}
+    </cac:Delivery>
+    {% endif %}
+    {% if d.incoterm %}
+    <cac:DeliveryTerms>
+        {% if d.specialTerms %}<cbc:SpecialTerms>{{ d.specialTerms }}</cbc:SpecialTerms>{% endif %}
+        <cbc:LossRiskResponsibilityCode>{{ d.incoterm }}</cbc:LossRiskResponsibilityCode>
+        <cbc:LossRisk>{{ d.lossRisk }}</cbc:LossRisk>
+    </cac:DeliveryTerms>
+    {% endif %}
+{% endif %}

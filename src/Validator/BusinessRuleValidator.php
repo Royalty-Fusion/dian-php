@@ -7,6 +7,7 @@ namespace RoyaltyFusion\DianPhp\Validator;
 use RoyaltyFusion\DianPhp\Catalog\CurrencyRegistry;
 use RoyaltyFusion\DianPhp\Catalog\MunicipioRegistry;
 use RoyaltyFusion\DianPhp\Catalog\PaymentMethodRegistry;
+use RoyaltyFusion\DianPhp\Catalog\TipoDocumentoEquivalente;
 use RoyaltyFusion\DianPhp\Catalog\TipoDocumentoIdentificacion;
 use RoyaltyFusion\DianPhp\Catalog\TipoFactura;
 use RoyaltyFusion\DianPhp\Catalog\TipoOperacion;
@@ -17,9 +18,12 @@ use RoyaltyFusion\DianPhp\Model\Client;
 use RoyaltyFusion\DianPhp\Model\Company;
 use RoyaltyFusion\DianPhp\Model\CreditNote;
 use RoyaltyFusion\DianPhp\Model\DebitNote;
+use RoyaltyFusion\DianPhp\Model\Delivery;
+use RoyaltyFusion\DianPhp\Model\EquivalentDocument;
 use RoyaltyFusion\DianPhp\Model\Invoice;
 use RoyaltyFusion\DianPhp\Model\NitDvCalculator;
 use RoyaltyFusion\DianPhp\Model\Resolution;
+use RoyaltyFusion\DianPhp\Sector\SectorSalud;
 use RoyaltyFusion\DianPhp\SupportDocument\SupportDocument;
 use RoyaltyFusion\DianPhp\SupportDocument\SupportDocumentAdjustmentNote;
 use RoyaltyFusion\DianPhp\Xml\DocumentCalculator;
@@ -41,8 +45,9 @@ use RoyaltyFusion\DianPhp\Xml\DocumentCalculator;
  *   PAY_001..004    medios y formas de pago
  *   RES_000..005    resolución de numeración
  *   SOFT_001..004   software, PIN y clave técnica
- *   NOTE_001..005   notas crédito/débito y nota de ajuste
- *   INV_001..003    tipo de factura y de operación
+ *   NOTE_001..006   notas crédito/débito, nota de ajuste y ajuste a documento equivalente
+ *   INV_001..007    tipo de factura y de operación, exportación (Incoterm), sector salud, mandatos
+ *   DEE_001..005    documento equivalente electrónico (POS y demás)
  *   DS_001..003     documento soporte
  *   ENV_001..003    coherencia con el ambiente (habilitación / producción)
  */
@@ -77,7 +82,11 @@ final class BusinessRuleValidator
             $this->validateClient($document->getClient(), $result, 'adquiriente', $document instanceof Invoice && $document->getInvoiceTypeCode() === '02');
         }
 
-        if ($document instanceof Invoice) {
+        if ($document instanceof EquivalentDocument) {
+            $this->validateEquivalentDocument($document, $result);
+            $this->validateResolution($document->getResolution(), $document->getPrefijo(), $document->getNumero(), $document->getFecha(), $result);
+            $this->validateSoftware($document, $result);
+        } elseif ($document instanceof Invoice) {
             $this->validateInvoiceType($document, $result);
             $this->validateResolution($document->getResolution(), $document->getPrefijo(), $document->getNumero(), $document->getFecha(), $result);
             $this->validateSoftware($document, $result);
@@ -189,7 +198,9 @@ final class BusinessRuleValidator
         $this->validateResponsabilidades($client->getResponsabilidades() ?: 'R-99-PN', $r, $role);
 
         $email = $client->getContact()?->getElectronicMail() ?: $client->getEmail();
-        if ($email === '') {
+        if ($email === '' && $client->isConsumidorFinal()) {
+            // Consumidor final: no delivery by e-mail.
+        } elseif ($email === '') {
             $r->add('PARTY_013', "El {$role} no tiene correo: no podrá recibir la factura (AttachedDocument).", '', 'warning');
         } elseif (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
             $r->add('PARTY_013', "Correo del {$role} inválido: {$email}.");
@@ -306,7 +317,9 @@ final class BusinessRuleValidator
         foreach ($doc->getItems() as $item) {
             foreach ($item->getTaxes() as $tax) {
                 if (!$tax->isRetention()) {
-                    $amount = $tax->getAmount() ?: $tax->getBase() * $tax->getPercent() / 100;
+                    $amount = $tax->getAmount() ?: ($tax->isPerUnit()
+                        ? $tax->getPerUnitAmount() * $tax->getBaseUnitMeasure()
+                        : $tax->getBase() * $tax->getPercent() / 100);
                     $lineTotals[$tax->getCode()] = ($lineTotals[$tax->getCode()] ?? 0.0) + round($amount, 2);
                 }
             }
@@ -405,7 +418,7 @@ final class BusinessRuleValidator
                 $r->add('SOFT_004', 'El PIN del software normalmente es de 5 dígitos; verifique el registrado en la DIAN.', '', 'warning');
             }
         }
-        if ($doc instanceof Invoice && preg_match('/^[0-9a-f]{40,64}$/i', $doc->getTechnicalKey()) !== 1) {
+        if ($doc instanceof Invoice && !$doc instanceof EquivalentDocument && preg_match('/^[0-9a-f]{40,64}$/i', $doc->getTechnicalKey()) !== 1) {
             $r->add('SOFT_003', 'Falta la clave técnica de la resolución (setTechnicalKey). Obténgala con Dian::getNumberingRanges().');
         }
     }
@@ -414,7 +427,7 @@ final class BusinessRuleValidator
     {
         $credit   = $note instanceof CreditNote;
         $expected = $note->getBillingReference() !== null ? ($credit ? '20' : '30') : ($credit ? '22' : '32');
-        if ($note->getCustomizationId() !== $expected) {
+        if ($note->getCustomizationId() !== $expected && !in_array($note->getCustomizationId(), SectorSalud::OPERACIONES, true)) {
             $r->add('NOTE_005', "CustomizationID {$note->getCustomizationId()} no corresponde: con referencia a factura use " . ($credit ? '20' : '30') . ', sin referencia ' . ($credit ? '22' : '32') . '.');
         }
 
@@ -431,16 +444,41 @@ final class BusinessRuleValidator
             }
         }
 
-        $ref = $note->getBillingReference();
-        if ($ref !== null) {
+        foreach ($note->getBillingReferences() as $ref) {
+            $which = $ref->getNumber() !== '' ? " ({$ref->getNumber()})" : '';
             if ($ref->getNumber() === '' || $ref->getDate() === null) {
-                $r->add('NOTE_003', 'La referencia a la factura requiere número y fecha de emisión.');
+                $r->add('NOTE_003', "La referencia a la factura{$which} requiere número y fecha de emisión.");
             }
             if (preg_match('/^[0-9a-f]{96}$/', $ref->getUuid()) !== 1) {
-                $r->add('NOTE_003', 'El CUFE de la factura referenciada debe tener 96 caracteres hexadecimales.');
+                $r->add('NOTE_003', "El CUFE de la factura referenciada{$which} debe tener 96 caracteres hexadecimales.");
             }
-        } elseif ($note->getInvoicePeriodStart() === null) {
+            if ($note->isAjusteDocumentoEquivalente() && $ref->getUuidSchemeName() !== 'CUDE-SHA384') {
+                $r->add('NOTE_006', "La nota de ajuste a un documento equivalente{$which} referencia su CUDE: BillingReference::setUuidSchemeName('CUDE-SHA384').");
+            }
+        }
+        if ($note->getBillingReferences() === [] && $note->getInvoicePeriodStart() === null) {
             $r->add('NOTE_004', 'Nota sin referencia a factura: indique el periodo facturado (setInvoicePeriod).');
+        }
+    }
+
+    private function validateEquivalentDocument(EquivalentDocument $doc, ValidationResult $r): void
+    {
+        $tipo = TipoDocumentoEquivalente::tryFrom($doc->getTipo());
+        if ($tipo === null || in_array($tipo->value, ['93', '94'], true)) {
+            $r->add('DEE_004', "Tipo de documento equivalente '{$doc->getTipo()}' inválido (20 POS, 25, 27, 30, 35, 40, 45, 50, 55, 60).");
+        }
+        if ($doc->isPos()) {
+            if ($doc->getFabricanteSoftware() === null) {
+                $r->add('DEE_001', 'Documento POS sin información del fabricante del software (setFabricanteSoftware).');
+            }
+            if ($doc->getPuntoVenta() === null) {
+                $r->add('DEE_002', 'Documento POS sin información de la caja (setPuntoVenta).');
+            }
+            if ($doc->getBeneficiosComprador() === null) {
+                $r->add('DEE_003', 'Documento POS sin beneficios del comprador (setBeneficiosComprador); infórmelo si el comercio tiene programa de puntos.', '', 'warning');
+            }
+        } elseif (!in_array($doc->getTipo(), ['20', '35', '60'], true)) {
+            $r->add('DEE_005', "Para el tipo {$doc->getTipo()} el SDK usa un ProfileID genérico y no modela los campos específicos; confírmelos en habilitación.", '', 'warning');
         }
     }
 
@@ -450,8 +488,30 @@ final class BusinessRuleValidator
             $r->add('INV_001', "Tipo de factura '{$invoice->getInvoiceTypeCode()}' inválido (01, 02, 03, 04).");
         }
         $operation = TipoOperacion::tryFrom($invoice->getCustomizationId());
-        if ($operation === null || in_array($operation->value, ['20', '22', '30', '32'], true)) {
+        $salud     = in_array($invoice->getCustomizationId(), SectorSalud::OPERACIONES, true);
+        if (!$salud && ($operation === null || in_array($operation->value, ['20', '22', '23', '30', '32', '33'], true))) {
             $r->add('INV_003', "Tipo de operación '{$invoice->getCustomizationId()}' no aplica a facturas.");
+        }
+        if ($salud && $invoice->getExtensions() === []) {
+            $r->add('INV_006', 'Factura del sector salud sin la extensión de interoperabilidad (SectorSalud::toExtension()).');
+        }
+
+        $mandatos = 0;
+        foreach ($invoice->getItems() as $item) {
+            $mandatos += $item->getMandanteNit() !== '' ? 1 : 0;
+        }
+        if ($invoice->getCustomizationId() === TipoOperacion::MANDATOS->value && $mandatos === 0) {
+            $r->add('INV_007', 'Factura de mandatos (11) sin líneas con mandante: use Item::setMandante($nit).');
+        } elseif ($mandatos > 0 && $invoice->getCustomizationId() !== TipoOperacion::MANDATOS->value) {
+            $r->add('INV_007', "Hay líneas con mandante pero el tipo de operación es '{$invoice->getCustomizationId()}' (mandatos = 11).", '', 'warning');
+        }
+
+        $delivery = $invoice->getDelivery();
+        if ($delivery !== null && $delivery->getIncoterm() !== '' && !isset(Delivery::INCOTERMS[$delivery->getIncoterm()])) {
+            $r->add('INV_005', "Incoterm '{$delivery->getIncoterm()}' inválido (" . implode(', ', array_keys(Delivery::INCOTERMS)) . ').');
+        }
+        if ($invoice->getInvoiceTypeCode() === '02' && ($delivery === null || $delivery->getIncoterm() === '')) {
+            $r->add('INV_004', 'Factura de exportación sin condiciones de entrega (Delivery::setIncoterm()).', '', 'warning');
         }
         if ($invoice->getInvoiceTypeCode() === '02' && $invoice->getCurrencyCode() === 'COP') {
             $r->add('INV_002', 'Factura de exportación en COP: normalmente se factura en la moneda extranjera con TRM.', '', 'warning');

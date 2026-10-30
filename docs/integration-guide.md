@@ -172,7 +172,7 @@ $invoice = (new Invoice())
     ->setPrefijo('SETP')->setNumero('990000001')           // número solo dígitos
     ->setFecha(new DateTimeImmutable('now', new DateTimeZone('America/Bogota')))
     ->setTipoFactura(TipoFactura::VENTA)                    // 02 exportación, 03/04 contingencia
-    ->setTipoOperacion(TipoOperacion::ESTANDAR)             // 11 AIU, 12 mandatos…
+    ->setTipoOperacion(TipoOperacion::ESTANDAR)             // 09 AIU, 11 mandatos, 12 transporte…
     ->setCompany($company)->setClient($client)
     ->setSoftware($software)->setResolution($resolution)
     ->setTechnicalKey($technicalKey)

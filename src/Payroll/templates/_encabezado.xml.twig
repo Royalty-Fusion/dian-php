@@ -1,0 +1,13 @@
+{#- NumeroSecuenciaXML … Empleador. params: doc, cune, qrCode, version, full (Reemplazar/Individual), fechaGen, horaGen -#}
+<NumeroSecuenciaXML{% if doc.codigoTrabajador or (doc.trabajador and doc.trabajador.codigoTrabajador) %} CodigoTrabajador="{{ doc.codigoTrabajador ?: doc.trabajador.codigoTrabajador }}"{% endif %} Prefijo="{{ doc.prefijo }}" Consecutivo="{{ doc.consecutivo }}" Numero="{{ doc.prefijo }}{{ doc.numero }}"/>
+    <LugarGeneracionXML Pais="{{ doc.lugarPais }}" DepartamentoEstado="{{ doc.lugarDepartamentoEstado }}" MunicipioCiudad="{{ doc.lugarMunicipioCiudad }}" Idioma="{{ doc.lugarIdioma }}"/>
+    <ProveedorXML RazonSocial="{{ doc.proveedorRazonSocial }}" NIT="{{ providerNit }}" DV="{{ providerDv }}" SoftwareID="{{ doc.software ? doc.software.id }}" SoftwareSC="{{ doc.softwareSC }}"/>
+    <CodigoQR>{{ qrCode }}</CodigoQR>
+    <InformacionGeneral Version="{{ version }}" Ambiente="{{ doc.ambiente }}" TipoXML="{{ doc.tipoXML }}" CUNE="{{ cune }}" EncripCUNE="CUNE-SHA384" FechaGen="{{ fechaGen }}" HoraGen="{{ horaGen }}"{% if full %} PeriodoNomina="{{ doc.periodoNomina }}" TipoMoneda="{{ doc.tipoMoneda }}" TRM="{{ doc.trm > 0 ? doc.trm|money : '1' }}"{% endif %}/>
+    {% for nota in doc.notas %}
+    <Notas>{{ nota }}</Notas>
+    {% endfor %}
+    {% if doc.empleador %}
+    {% set emp = doc.empleador %}
+    <Empleador RazonSocial="{{ emp.nombreRazonSocial }}" NIT="{{ emp.nit }}" DV="{{ emp.dv }}" Pais="{{ emp.pais }}" DepartamentoEstado="{{ emp.departamentoEstado }}" MunicipioCiudad="{{ emp.municipioCiudad }}" Direccion="{{ emp.direccion }}"/>
+    {% endif %}

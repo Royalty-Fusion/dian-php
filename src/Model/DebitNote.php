@@ -16,7 +16,8 @@ class DebitNote
     private Company $company;
     private Client $client;
     private Software $software;
-    private BillingReference $billingReference;
+    /** @var list<BillingReference> */
+    private array $billingReferences = [];
     private DiscrepancyResponse $discrepancyResponse;
 
     /** @var Item[] */
@@ -108,15 +109,30 @@ class DebitNote
         return $this->software ?? null;
     }
 
+    /** Factura corregida. Replaces any reference added before; see addBillingReference(). */
     public function setBillingReference(BillingReference $billingReference): self
     {
-        $this->billingReference = $billingReference;
+        $this->billingReferences = [$billingReference];
         return $this;
     }
 
+    /** One note can correct several invoices: add one reference per invoice. */
+    public function addBillingReference(BillingReference $billingReference): self
+    {
+        $this->billingReferences[] = $billingReference;
+        return $this;
+    }
+
+    /** First referenced invoice (null for notes sin referencia). */
     public function getBillingReference(): ?BillingReference
     {
-        return $this->billingReference ?? null;
+        return $this->billingReferences[0] ?? null;
+    }
+
+    /** @return list<BillingReference> */
+    public function getBillingReferences(): array
+    {
+        return $this->billingReferences;
     }
 
     public function setDiscrepancyResponse(DiscrepancyResponse $discrepancyResponse): self
@@ -196,6 +212,27 @@ class DebitNote
 
     protected function defaultCustomizationId(): string
     {
-        return isset($this->billingReference) ? '30' : '32';
+        return $this->billingReferences !== [] ? '30' : '32';
+    }
+
+    private bool $ajusteDocumentoEquivalente = false;
+
+    /** Marks the note as nota de ajuste débito al documento equivalente (93). */
+    public function setAjusteDocumentoEquivalente(bool $enabled = true): self
+    {
+        $this->ajusteDocumentoEquivalente = $enabled;
+        return $this;
+    }
+
+    public function isAjusteDocumentoEquivalente(): bool
+    {
+        return $this->ajusteDocumentoEquivalente;
+    }
+
+    public function getProfileId(): string
+    {
+        return $this->ajusteDocumentoEquivalente
+            ? 'DIAN 2.1: Nota de ajuste débito al documento equivalente'
+            : 'DIAN 2.1: Nota Débito de Factura Electrónica de Venta';
     }
 }

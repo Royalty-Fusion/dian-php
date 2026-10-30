@@ -7,13 +7,12 @@ namespace RoyaltyFusion\DianPhp\Payroll;
 use RoyaltyFusion\DianPhp\Model\Software;
 
 /**
- * Nómina Individual Electrónica (NIE) — main aggregate.
+ * Documento soporte de pago de Nómina Individual Electrónica (TipoXML 102).
  *
- * Anexo Técnico Nómina Electrónica v2.0. Targets the dedicated DIAN endpoint
- * (apifedi.dian.gov.co/Nomina) not the regular VPFE.
- *
- * Fields and structure adapted from the reference recipe in
- * lopezsoft/ubl21dian's SignPayroll (MIT, credited in CREDITS.md).
+ * Sent to the same VPFE web service as invoices (SendNominaSync, or
+ * SendTestSetAsync for the nómina set de pruebas), signed with XAdES.
+ * The nómina software is registered separately in DIAN: use its own
+ * SoftwareID and PIN.
  */
 class PayrollDocument
 {
@@ -59,6 +58,12 @@ class PayrollDocument
     /** @var string[] */
     private array $notas = [];
 
+    /** @var list<\DateTimeInterface> */
+    private array $fechasPago = [];
+    private string $proveedorRazonSocial = '';
+    private ?bool $novedad = null;
+    private string $cuneNovedad = '';
+
     public function __construct()
     {
         $this->devengados  = new Devengados();
@@ -83,8 +88,36 @@ class PayrollDocument
     public function setFechaGen(\DateTimeInterface $v): self { $this->fechaGen = $v; return $this; }
     public function getFechaGen(): ?\DateTimeInterface { return $this->fechaGen ?? null; }
 
-    public function setFechaPago(\DateTimeInterface $v): self { $this->fechaPago = $v; return $this; }
+    public function setFechaPago(\DateTimeInterface $v): self { $this->fechaPago = $v; $this->fechasPago = [$v]; return $this; }
     public function getFechaPago(): ?\DateTimeInterface { return $this->fechaPago ?? null; }
+
+    /** Additional payment date (FechasPagos admits several, e.g. quincenas). */
+    public function addFechaPago(\DateTimeInterface $v): self
+    {
+        $this->fechaPago ??= $v;
+        $this->fechasPago[] = $v;
+        return $this;
+    }
+
+    /** @return list<\DateTimeInterface> */
+    public function getFechasPago(): array { return $this->fechasPago; }
+
+    /** Razón social of whoever generates the XML (ProveedorXML); defaults to the employer. */
+    public function setProveedorRazonSocial(string $v): self { $this->proveedorRazonSocial = $v; return $this; }
+    public function getProveedorRazonSocial(): string
+    {
+        return $this->proveedorRazonSocial !== '' ? $this->proveedorRazonSocial : ($this->empleador?->getNombreRazonSocial() ?? '');
+    }
+
+    /** Novedad contractual (and the CUNE of the payroll it changes). */
+    public function setNovedad(bool $novedad, string $cuneNovedad = ''): self
+    {
+        $this->novedad     = $novedad;
+        $this->cuneNovedad = $cuneNovedad;
+        return $this;
+    }
+    public function getNovedad(): ?bool { return $this->novedad; }
+    public function getCuneNovedad(): string { return $this->cuneNovedad; }
 
     public function setAmbiente(string $v): self { $this->ambiente = $v; return $this; }
     public function getAmbiente(): string { return $this->ambiente; }

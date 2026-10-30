@@ -1,5 +1,11 @@
-{#- DIAN extension (UBLExtension #1) + empty slot for the XAdES signature (#2). -#}
+{#- Sector extensions, DIAN extension, more sector extensions and the empty slot for the XAdES signature (always last). -#}
 <ext:UBLExtensions>
+        {% import '@dian/nodes.xml.twig' as n %}
+        {% for extension in doc.extensions|default([])|filter(e => e.beforeDianExtensions) %}
+        <ext:UBLExtension>
+            <ext:ExtensionContent>{% for node in extension.nodes %}{{ n.node(node) }}{% endfor %}</ext:ExtensionContent>
+        </ext:UBLExtension>
+        {% endfor %}
         <ext:UBLExtension>
             <ext:ExtensionContent>
                 <sts:DianExtensions>
@@ -32,6 +38,11 @@
                 </sts:DianExtensions>
             </ext:ExtensionContent>
         </ext:UBLExtension>
+        {% for extension in doc.extensions|default([])|filter(e => not e.beforeDianExtensions) %}
+        <ext:UBLExtension>
+            <ext:ExtensionContent>{% for node in extension.nodes %}{{ n.node(node) }}{% endfor %}</ext:ExtensionContent>
+        </ext:UBLExtension>
+        {% endfor %}
         <ext:UBLExtension>
             <ext:ExtensionContent/>
         </ext:UBLExtension>

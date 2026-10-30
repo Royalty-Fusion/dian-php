@@ -19,7 +19,7 @@ trait HasDocumentOptions
 
     /**
      * Tipo de operación (cbc:CustomizationID), e.g. TipoOperacion::ESTANDAR (10),
-     * TipoOperacion::AIU (11), TipoOperacion::MANDATARIOS (12).
+     * TipoOperacion::AIU (09), TipoOperacion::MANDATOS (11), TipoOperacion::TRANSPORTE (12).
      */
     public function setTipoOperacion(TipoOperacion|string $tipoOperacion): self
     {
@@ -64,5 +64,19 @@ trait HasDocumentOptions
     public function getInvoicePeriodEnd(): ?\DateTimeInterface
     {
         return $this->invoicePeriodEnd;
+    }
+
+    private ?Delivery $delivery = null;
+
+    /** Entrega y condiciones de entrega (Incoterm) — facturas de exportación. */
+    public function setDelivery(Delivery $delivery): self
+    {
+        $this->delivery = $delivery;
+        return $this;
+    }
+
+    public function getDelivery(): ?Delivery
+    {
+        return $this->delivery;
     }
 }
